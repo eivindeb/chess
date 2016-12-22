@@ -29,24 +29,24 @@ Board::Board() {
 
 	sideToMove = WHITE;
 	halfMoveCount = 0;
-	for (int i = 0; i < 24; i++) {
-		enPassant[i] = -1;
-	}
+	enPassant = -1;
+	historyIndex = 0;
+	wCastlingRights = CASTLE_BOTH;
+	bCastlingRights = CASTLE_BOTH;
 }
 
 int Board::getLegalMoves(int *moves) {
 	int movesInPosition = 0;
 	int newPos;
 
-	for (int sq = 0; sq < 128; sq++) {
+	for (int sq = 0; sq < 120; sq++) {
 		if (board[sq] != EMPTY && boardColor[sq] == sideToMove) {  // a players piece on this square
 			if (board[sq] == PAWN) {  // TODO might have to check for out of bounds here but i dont think it is necessary
-				if (enPassant[8 * sideToMove + sq % 8 + 8] == -1) {
+				if ((sideToMove == WHITE && sq / 16 == 1) || (sideToMove == BLACK && sq / 16 == 6)) {
 					int doubleMove = (sideToMove == WHITE) ? 3 : 7;
 					if (board[sq + pieceDeltas[PAWN][doubleMove]] == EMPTY) {
 						move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][doubleMove], 0, 0, 0);
 					}
-					enPassant[8 * sideToMove + sq % 8 + 8] = halfMoveCount;
 				}
 				if (boardColor[sq + pieceDeltas[PAWN][0]] == (sideToMove*(-1))) {
 					move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][0], 1, board[sq + pieceDeltas[PAWN][0]], board[sq]);
@@ -92,6 +92,46 @@ int Board::getLegalMoves(int *moves) {
 	return movesInPosition;
 }
 
+void Board::moveMake(int move) {
+	int initSq = (move & 0x7F);
+	int tarSq = ((move & 0x7F00) >> 7);
+	int capture = (move) & MFLAGS_CPT;
+	if (capture) {
+		materialTotal += (pieceValues[(move & (0b111 << 15)) >> 15] * sideToMove);
+	}
+	history[historyIndex++] = move + (enPassant << 26) + (wCastlingRights << 34) + (bCastlingRights << 37);
+	board[tarSq] = board[initSq];
+
+	if (enPassant != -1) {
+		enPassant = -1;
+	}
+
+	halfMoveCount++;
+	sideToMove = Color(sideToMove*(-1));
+}
+
+void Board::moveUnmake() {
+	int move = history[historyIndex--];
+	int initSq = (move & 0x7F);
+	int tarSq = ((move & 0x7F00) >> 7);
+	int capture = (move)& MFLAGS_CPT;
+	if (capture) {
+		int capturedPiece = (move & (0b111 << 15)) >> 15;
+		materialTotal -= (pieceValues[capturedPiece] * sideToMove);
+		board[tarSq] = Piece(capturedPiece);
+	}
+	else {
+		board[tarSq] = EMPTY;
+	}
+	board[initSq] = Piece((move & (0b111 << 15)) >> 15);
+
+	wCastlingRights = (move & (0b111 << 34)) >> 34;
+	bCastlingRights = (move & (0b111 << 37)) >> 37;
+	enPassant = (move & (0xFF << 26)) >> 26;
+	halfMoveCount--;
+	sideToMove = Color(sideToMove*(-1));
+}
+
 void Board::printMoves(int *moves, int numOfMoves) {
 	std::cout << "Number of moves: " << numOfMoves << std::endl;
 	for (int i = 0; i < numOfMoves; i++) {
@@ -116,7 +156,7 @@ void Board::move_push_back(int *moves, int moveNum, int squareFrom, int squareTo
 }
 
 void Board::printBoard() {
-	for (int sq = 0; sq < 128; sq++) {
+	for (int sq = 0; sq < 120; sq++) {
 		if ((sq & 0x88) == 0) {
 			if (board[sq] == EMPTY) {
 				std::cout << "0 ";
@@ -214,21 +254,10 @@ std::string Board::getFenString() {
 
 	// TODO fix this (castling)
 	fen += " KQkq";
-	bool _enPassant = false;
-	for (int i = 0; i < 24; i++) {
-		if ((enPassant[i] != -1) && (enPassant[i] == halfMoveCount - 1)) {
-			if (i <= 7) { // black
-				fen += char((i % 8) + 97) + "6";
-				_enPassant = true;
-			}
-			else {
-				fen += char((i % 8) + 97) + "3";
-				_enPassant = true;
-
-			}
-		}
+	if (enPassant != -1) {
+		fen += char((enPassant % 8) + 97) + std::to_string((enPassant / 16) + 1);
 	}
-	if (_enPassant == false) {
+	else {
 		fen += " -";
 	}
 

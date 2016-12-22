@@ -21,6 +21,12 @@
 #define SW		-17
 #define WEST	-1
 
+#define MFLAGS_CPT	(1<<14)
+#define MFLAGS_ENP	(1 << 21)
+#define CASTLE_BOTH		4
+#define CASTLE_SHORT	1
+#define CASTLE_LONG		2
+
 
 
 enum Piece { KING, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY };
@@ -34,5 +40,23 @@ static int pieceDeltas[6][8] = {
 	{ NORTH, EAST, SOUTH, WEST, 0, 0, 0, 0 },		// rook
 	{ NW, NORTH, NE, EAST, SE, SOUTH, SW, WEST }	// queen
 };
+
+static int pieceValues[6] = { 10000, 100, 300, 300, 500, 900 };
+
+/* move is on the form:
+	initial square	(0-6 bit)
+	target square	(7-13 bit)
+	capture			(14 bit)
+	movedpiece		(15-17 bit)
+	attacker		(18-20 bit)
+	en passant		(21 bit)
+	promotion		(22 bit)
+	promoted to		(23-25 bit)
+	---------------------------
+	(in history)
+	enPassantbit	(26-33 bit)
+	wCastleRights	(34-36 bit)
+	bCastleRights	(37-39 bit)
+*/
 
 // TODO: reference additional headers your program requires here

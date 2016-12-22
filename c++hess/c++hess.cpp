@@ -15,6 +15,9 @@ int main()
 	myboard.printMoves(moves, numOfMoves);
 	myboard.printBoard();
 	std::cout << myboard.getFenString() << std::endl;
+	myboard.moveMake(7063);
+	myboard.printBoard();
+	std::cout << myboard.getFenString() << std::endl;
 	std::cin.get();
 }
 
