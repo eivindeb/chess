@@ -23,18 +23,16 @@
 
 
 
-enum Piece{KING, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY};
-enum Color {WHITE = 1, BLACK = -1, NONE = 0};
+enum Piece { KING, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY };
+enum Color { WHITE = 1, BLACK = -1, NONE = 0 };
 
-int piece_deltas[6][8] = {
-	{NW, NORTH, NE, EAST, SE, SOUTH, SW, WEST}, // king
-	{NORTH, NW, NE, NN, SOUTH, SE, SW, SS},		// pawn
-	{31, 33, 18, -14, -31, -33, -18, 14},		// knight
-	{NW, SW, NE, SE, 0, 0, 0, 0},				// bishop
-	{NORTH, EAST, SOUTH, WEST, 0, 0, 0, 0},		// rook
-	{NW, NORTH, NE, EAST, SE, SOUTH, SW, WEST}	// queen
+static int pieceDeltas[6][8] = {
+	{ NW, NORTH, NE, EAST, SE, SOUTH, SW, WEST }, // king
+	{ NW, NORTH, NE, NN, SE, SOUTH, SW, SS },		// pawn
+	{ 31, 33, 18, -14, -31, -33, -18, 14 },		// knight
+	{ NW, SW, NE, SE, 0, 0, 0, 0 },				// bishop
+	{ NORTH, EAST, SOUTH, WEST, 0, 0, 0, 0 },		// rook
+	{ NW, NORTH, NE, EAST, SE, SOUTH, SW, WEST }	// queen
 };
-
-
 
 // TODO: reference additional headers your program requires here

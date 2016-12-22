@@ -2,10 +2,17 @@
 //
 
 #include "stdafx.h"
+#include "Board.h"
+#include <iostream>
 
 
 int main()
-{
-    return 0;
+{	
+	Board myboard = Board();
+	int moves[218] = { 0 };
+	int numOfMoves = myboard.getLegalMoves(moves);
+	myboard.printMoves(moves, numOfMoves);
+	myboard.printBoard();
+	std::cin.get();
 }
 
