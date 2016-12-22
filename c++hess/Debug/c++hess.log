@@ -1,3 +1,8 @@
-﻿  c++hess.cpp
+﻿  Board.cpp
+d:\dev\ai\chess\c++hess\c++hess\board.cpp(106): warning C4293: '<<': shift count negative or too big, undefined behavior
+d:\dev\ai\chess\c++hess\c++hess\board.cpp(139): warning C4293: '<<': shift count negative or too big, undefined behavior
+d:\dev\ai\chess\c++hess\c++hess\board.cpp(139): warning C4293: '>>': shift count negative or too big, undefined behavior
+d:\dev\ai\chess\c++hess\c++hess\board.cpp(140): warning C4293: '<<': shift count negative or too big, undefined behavior
+d:\dev\ai\chess\c++hess\c++hess\board.cpp(140): warning C4293: '>>': shift count negative or too big, undefined behavior
   c++hess.vcxproj -> D:\dev\AI\chess\c++hess\Debug\c++hess.exe
   c++hess.vcxproj -> D:\dev\AI\chess\c++hess\Debug\c++hess.pdb (Full PDB)

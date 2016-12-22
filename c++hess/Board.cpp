@@ -2,6 +2,7 @@
 #include "Board.h"
 #include <iostream>
 #include <string>
+#include <stdlib.h>
 
 Board::Board() {
 	Piece backRow[8] = { ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK };
@@ -30,32 +31,35 @@ Board::Board() {
 	sideToMove = WHITE;
 	halfMoveCount = 0;
 	enPassant = -1;
-	historyIndex = 0;
+	for (int i = 0; i < 20; i++) {
+		history[i] = 0;
+	}
+	historyIndex = -1;
 	wCastlingRights = CASTLE_BOTH;
 	bCastlingRights = CASTLE_BOTH;
 }
 
-int Board::getLegalMoves(int *moves) {
+int Board::getLegalMoves(Move *moves) {
 	int movesInPosition = 0;
 	int newPos;
 
 	for (int sq = 0; sq < 120; sq++) {
 		if (board[sq] != EMPTY && boardColor[sq] == sideToMove) {  // a players piece on this square
 			if (board[sq] == PAWN) {  // TODO might have to check for out of bounds here but i dont think it is necessary
+				int dirMod = (sideToMove == WHITE) ? 0 : 4;
 				if ((sideToMove == WHITE && sq / 16 == 1) || (sideToMove == BLACK && sq / 16 == 6)) {
-					int doubleMove = (sideToMove == WHITE) ? 3 : 7;
-					if (board[sq + pieceDeltas[PAWN][doubleMove]] == EMPTY) {
-						move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][doubleMove], 0, 0, 0);
+					if (board[sq + pieceDeltas[PAWN][dirMod + 3]] == EMPTY) {
+						move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 3], 0, board[sq], 0);
 					}
 				}
-				if (boardColor[sq + pieceDeltas[PAWN][0]] == (sideToMove*(-1))) {
-					move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][0], 1, board[sq + pieceDeltas[PAWN][0]], board[sq]);
+				if (boardColor[sq + pieceDeltas[PAWN][dirMod]] == (sideToMove*(-1))) {
+					move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], 1, board[sq], board[sq + pieceDeltas[PAWN][dirMod]]);
 				}
-				if (board[sq + pieceDeltas[PAWN][1]] == EMPTY) {
-					move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][1], 0, 0, 0);
+				if (board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
+					move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 1], 0, board[sq], 0);
 				}
-				if (boardColor[sq + pieceDeltas[PAWN][2]] == (sideToMove*(-1))) {
-					move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][2], 1, board[sq + pieceDeltas[PAWN][2]], board[sq]);
+				if (boardColor[sq + pieceDeltas[PAWN][dirMod + 2]] == (sideToMove*(-1))) {
+					move_push_back(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], 1, board[sq], board[sq + pieceDeltas[PAWN][dirMod + 2]]);
 				}
 			}
 			else if (board[sq] <= 2) { // non sliding piece
@@ -66,7 +70,7 @@ int Board::getLegalMoves(int *moves) {
 							move_push_back(moves, movesInPosition++, sq, newPos, 1, board[sq], board[newPos]);
 						}
 						else if (board[newPos] == EMPTY) {
-							move_push_back(moves, movesInPosition++, sq, newPos, 0, 0, 0);
+							move_push_back(moves, movesInPosition++, sq, newPos, 0, board[sq], 0);
 						}
 					}
 				}
@@ -82,7 +86,7 @@ int Board::getLegalMoves(int *moves) {
 							}
 							break;
 						}
-						move_push_back(moves, movesInPosition++, sq, newPos, 0, 0, 0);
+						move_push_back(moves, movesInPosition++, sq, newPos, 0, board[sq], 0);
 					}
 				}
 			}
@@ -92,14 +96,14 @@ int Board::getLegalMoves(int *moves) {
 	return movesInPosition;
 }
 
-void Board::moveMake(int move) {
+void Board::moveMake(Move move) {
 	int initSq = (move & 0x7F);
 	int tarSq = ((move & 0x3f80) >> 7);
 	int capture = (move) & MFLAGS_CPT;
 	if (capture) {
 		materialTotal += (pieceValues[(move & (0b111 << 15)) >> 15] * sideToMove);
 	}
-	history[historyIndex++] = move + (enPassant << 26) + (wCastlingRights << 34) + (bCastlingRights << 37);
+	history[++historyIndex] = move | abs((enPassant << 26)) | (wCastlingRights << 34) | (bCastlingRights << 37);
 	board[tarSq] = board[initSq];
 	boardColor[tarSq] = boardColor[initSq];
 	board[initSq] = EMPTY;
@@ -118,7 +122,7 @@ void Board::moveUnmake() {
 	sideToMove = Color(sideToMove*(-1));
 	int initSq = (move & 0x7F);
 	int tarSq = ((move & 0x3f80) >> 7);
-	int capture = (move)& MFLAGS_CPT;
+	int capture = (move) & MFLAGS_CPT;
 	if (capture) {
 		int capturedPiece = (move & (0b111 << 15)) >> 15;
 		materialTotal -= (pieceValues[capturedPiece] * sideToMove);
@@ -138,7 +142,7 @@ void Board::moveUnmake() {
 	halfMoveCount--;
 }
 
-void Board::printMoves(int *moves, int numOfMoves) {
+void Board::printMoves(Move *moves, int numOfMoves) {
 	std::cout << "Number of moves: " << numOfMoves << std::endl;
 	for (int i = 0; i < numOfMoves; i++) {
 		std::cout << "og: " << moves[i] << "\t";
@@ -152,13 +156,8 @@ void Board::printMoves(int *moves, int numOfMoves) {
 	}
 }
 
-void Board::move_push_back(int *moves, int moveNum, int squareFrom, int squareTo, int capture, int attacked, int attacker) {
-	if (capture) {
-		moves[moveNum] = squareFrom + ((squareTo) << 7) + (capture << 14) + (attacked << 15) + (attacker << 18);
-	}
-	else {
-		moves[moveNum] = squareFrom + ((squareTo) << 7);
-	}
+void Board::move_push_back(Move *moves, int moveNum, int squareFrom, int squareTo, int flags, int movedPiece, int attacked) {
+	moves[moveNum] = Move{ squareFrom, squareTo, movedPiece, attacked, flags };
 }
 
 void Board::printBoard() {
