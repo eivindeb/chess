@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "Board.h"
 #include <iostream>
+#include <string>
 
 
 int main()
@@ -13,6 +14,7 @@ int main()
 	int numOfMoves = myboard.getLegalMoves(moves);
 	myboard.printMoves(moves, numOfMoves);
 	myboard.printBoard();
+	std::cout << myboard.getFenString() << std::endl;
 	std::cin.get();
 }
 

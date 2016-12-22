@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Board.h"
 #include <iostream>
+#include <string>
 
 Board::Board() {
 	Piece backRow[8] = { ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK };
@@ -136,62 +137,105 @@ void Board::printBoard() {
 std::string Board::getFenString() {
 	std::string fen = "";
 	int emptyCount = 0;
-	for (int sq = 0; sq < 128; sq++) {
+	int sq = 112;
+	while(sq >= 0) {
+		if (board[sq] != EMPTY) {
+			if (emptyCount != 0) {
+				fen += std::to_string(emptyCount);
+				emptyCount = 0;
+			}
+		}
 		switch (board[sq]) {
-			case PAWN:
-				if (boardColor[sq] == WHITE) {
-					fen += "P";
-				}
-				else {
-					fen += "p";
-				}
-				break;
-			case KING:
-				if (boardColor[sq] == WHITE) {
-					fen += "K";
-				}
-				else {
-					fen += "k";
-				}
-				break;
-			case KNIGHT:
-				if (boardColor[sq] == WHITE) {
-					fen += "N";
-				}
-				else {
-					fen += "n";
-				}
-				break;
-			case BISHOP:
-				if (boardColor[sq] == WHITE) {
-					fen += "B";
-				}
-				else {
-					fen += "b";
-				}
-				break;
-			case ROOK:
-				if (boardColor[sq] == WHITE) {
-					fen += "R";
-				}
-				else {
-					fen += "r";
-				}
-				break;
-			case QUEEN:
-				if (emptyCount != 0) {
-				}
-				if (boardColor[sq] == WHITE) {
-					fen += "Q";
-				}
-				else {
-					fen += "q";
-				}
-				break;
-			case EMPTY:
-				emptyCount++;
-				break;
+		case PAWN:
+			if (boardColor[sq] == WHITE) {
+				fen += "P";
+			}
+			else {
+				fen += "p";
+			}
+			break;
+		case KING:
+			if (boardColor[sq] == WHITE) {
+				fen += "K";
+			}
+			else {
+				fen += "k";
+			}
+			break;
+		case KNIGHT:
+			if (boardColor[sq] == WHITE) {
+				fen += "N";
+			}
+			else {
+				fen += "n";
+			}
+			break;
+		case BISHOP:
+			if (boardColor[sq] == WHITE) {
+				fen += "B";
+			}
+			else {
+				fen += "b";
+			}
+			break;
+		case ROOK:
+			if (boardColor[sq] == WHITE) {
+				fen += "R";
+			}
+			else {
+				fen += "r";
+			}
+			break;
+		case QUEEN:
+			if (boardColor[sq] == WHITE) {
+				fen += "Q";
+			}
+			else {
+				fen += "q";
+			}
+			break;
+		case EMPTY:
+			emptyCount++;
+			break;
+		}
+		sq += 1;
+		if ((sq & 0x88) != 0) {
+			if (emptyCount != 0) {
+				fen += std::to_string(emptyCount);
+				emptyCount = 0;
+			}
+			if (sq > 8) {
+				fen += "/";
+			}
+			sq -= 24;
 		}
 	}
+	fen += (sideToMove == WHITE) ? " w" : " b";
+
+	// TODO fix this (castling)
+	fen += " KQkq";
+	bool _enPassant = false;
+	for (int i = 0; i < 24; i++) {
+		if ((enPassant[i] != -1) && (enPassant[i] == halfMoveCount - 1)) {
+			if (i <= 7) { // black
+				fen += char((i % 8) + 97) + "6";
+				_enPassant = true;
+			}
+			else {
+				fen += char((i % 8) + 97) + "3";
+				_enPassant = true;
+
+			}
+		}
+	}
+	if (_enPassant == false) {
+		fen += " -";
+	}
+
+	// TODO fix this, should be number of half moves since last pawn advancement or capture
+	fen += " 0 ";
+
+	fen += std::to_string(int(halfMoveCount / 2) + 1);
+
 	return fen;
 }
