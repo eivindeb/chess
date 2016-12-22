@@ -94,13 +94,16 @@ int Board::getLegalMoves(int *moves) {
 
 void Board::moveMake(int move) {
 	int initSq = (move & 0x7F);
-	int tarSq = ((move & 0x7F00) >> 7);
+	int tarSq = ((move & 0x3f80) >> 7);
 	int capture = (move) & MFLAGS_CPT;
 	if (capture) {
 		materialTotal += (pieceValues[(move & (0b111 << 15)) >> 15] * sideToMove);
 	}
 	history[historyIndex++] = move + (enPassant << 26) + (wCastlingRights << 34) + (bCastlingRights << 37);
 	board[tarSq] = board[initSq];
+	boardColor[tarSq] = boardColor[initSq];
+	board[initSq] = EMPTY;
+	boardColor[initSq] = NONE;
 
 	if (enPassant != -1) {
 		enPassant = -1;
@@ -112,24 +115,27 @@ void Board::moveMake(int move) {
 
 void Board::moveUnmake() {
 	int move = history[historyIndex--];
+	sideToMove = Color(sideToMove*(-1));
 	int initSq = (move & 0x7F);
-	int tarSq = ((move & 0x7F00) >> 7);
+	int tarSq = ((move & 0x3f80) >> 7);
 	int capture = (move)& MFLAGS_CPT;
 	if (capture) {
 		int capturedPiece = (move & (0b111 << 15)) >> 15;
 		materialTotal -= (pieceValues[capturedPiece] * sideToMove);
 		board[tarSq] = Piece(capturedPiece);
+		boardColor[tarSq] = Color(sideToMove*(-1));
 	}
 	else {
 		board[tarSq] = EMPTY;
+		boardColor[tarSq] = NONE;
 	}
 	board[initSq] = Piece((move & (0b111 << 15)) >> 15);
+	boardColor[initSq] = sideToMove;
 
 	wCastlingRights = (move & (0b111 << 34)) >> 34;
 	bCastlingRights = (move & (0b111 << 37)) >> 37;
 	enPassant = (move & (0xFF << 26)) >> 26;
 	halfMoveCount--;
-	sideToMove = Color(sideToMove*(-1));
 }
 
 void Board::printMoves(int *moves, int numOfMoves) {
@@ -156,20 +162,31 @@ void Board::move_push_back(int *moves, int moveNum, int squareFrom, int squareTo
 }
 
 void Board::printBoard() {
-	for (int sq = 0; sq < 120; sq++) {
-		if ((sq & 0x88) == 0) {
-			if (board[sq] == EMPTY) {
-				std::cout << "0 ";
-			}
-			else if (board[sq] == KING) {
-				std::cout << "6 ";
+	int sq = 112;
+	while(sq >= 0){
+		if (board[sq] == EMPTY) {
+			std::cout << "0  ";
+		}
+		else if (board[sq] == KING) {
+			if (boardColor[sq] == -1) {
+				std::cout << "*6 ";
 			}
 			else {
-				std::cout << board[sq] << " ";
+				std::cout << "6  ";
 			}
 		}
-		if ((sq % 8) == 7) {
+		else {
+			if (boardColor[sq] == -1) {
+				std::cout << "*" << board[sq] << " ";
+			}
+			else {
+				std::cout << board[sq] << "  ";
+			}	
+		}
+		sq++;
+		if ((sq & 0x88) != 0) {
 			std::cout << std::endl;
+			sq -= 24;
 		}
 	}
 }
@@ -238,7 +255,7 @@ std::string Board::getFenString() {
 			emptyCount++;
 			break;
 		}
-		sq += 1;
+		sq++;
 		if ((sq & 0x88) != 0) {
 			if (emptyCount != 0) {
 				fen += std::to_string(emptyCount);

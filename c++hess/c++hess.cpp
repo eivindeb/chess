@@ -10,6 +10,7 @@
 int main()
 {	
 	Board myboard = Board();
+
 	int moves[218] = { 0 };
 	int numOfMoves = myboard.getLegalMoves(moves);
 	myboard.printMoves(moves, numOfMoves);
@@ -17,7 +18,11 @@ int main()
 	std::cout << myboard.getFenString() << std::endl;
 	myboard.moveMake(7063);
 	myboard.printBoard();
+
 	std::cout << myboard.getFenString() << std::endl;
+	numOfMoves = myboard.getLegalMoves(moves);
+	myboard.printMoves(moves, numOfMoves);
+
 	std::cin.get();
 }
 
