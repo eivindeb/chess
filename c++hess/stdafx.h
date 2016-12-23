@@ -21,8 +21,11 @@
 #define SW		-17
 #define WEST	-1
 
-#define MFLAGS_CPT		1
-#define MFLAGS_ENP		2
+#define MFLAGS_CPT			1
+#define MFLAGS_ENP			2
+#define MFLAGS_PAWN_DOUBLE	4
+#define MFLAGS_CASTLE		8
+
 #define CASTLE_BOTH		4
 #define CASTLE_SHORT	1
 #define CASTLE_LONG		2
@@ -49,6 +52,13 @@ struct Move {
 	int movedPiece;
 	int attackedPiece;
 	int flags;
+};
+
+struct State {
+	Move move;
+	int wCastleRights;
+	int bCastleRights;
+	int enPassant;
 };
 
 /* move is on the form:

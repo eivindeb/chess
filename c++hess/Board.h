@@ -6,7 +6,7 @@ class Board {
 		Piece board[128];
 		Color boardColor[128];
 		Color sideToMove;
-		long history[20]; // max search depth
+		State history[20]; // max search depth
 		int historyIndex;
 		int wCastlingRights;
 		int bCastlingRights;
