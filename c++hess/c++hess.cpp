@@ -46,27 +46,7 @@ int main()
 	myboard.moveUnmake();
 	myboard.printBoard();
 
-	myboard.moveUnmake();
-	myboard.printBoard();
-
-	myboard.moveUnmake();
-	myboard.printBoard();
-
-	myboard.moveUnmake();
-	myboard.printBoard();
-
-	myboard.moveUnmake();
-	myboard.printBoard();
-
-	numOfMoves = myboard.getLegalMoves(moves);
-	myboard.printMoves(moves, numOfMoves);
-	std::cout << myboard.getFenString() << std::endl;
-
-	myboard.moveMake(moves[8]);
-	myboard.printBoard();
-
-	myboard.moveUnmake();
-	myboard.printBoard();
+	std::cout << "Square b5 is attacked: " << myboard.sqIsAttacked(65) << std::endl;
 
 	std::cin.get();
 }
