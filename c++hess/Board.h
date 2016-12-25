@@ -22,8 +22,8 @@ class Board {
 		void moveMake(Move move);
 		void moveUnmake();
 		int materialTotal;
-		bool sqIsAttacked(int ckdSq, int xRaySq = -1); // TODO this can be expanded to give number of attackers etc.
-		int getSqAttackers(int *attackingSq, int chkdSq);
+		bool sqIsAttacked(int ckdSq, int xRaySq = -1, int ignoreAttackerOnSq = -1); // TODO this can be expanded to give number of attackers etc.
+		int getSqAttackers(int *attackingSquares, int chkdSq);
 	private:
 		void move_add_if_legal(Move *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int flags);
 		int wKingSq;

@@ -48,8 +48,11 @@ int main()
 
 	std::cout << "Square b5 is attacked: " << myboard.sqIsAttacked(65) << std::endl;*/
 
-	Board myboard = Board("rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2");
+	Board myboard = Board("r4bkr/ppp3pp/2n1B3/4p3/8/8/PPPP1PPP/RNB1K2R b KQ - 0 3");
 	myboard.printBoard();
+	Move moves[218];
+	int numOfMoves = myboard.getLegalMovesInCheck(moves);
+	myboard.printMoves(moves, numOfMoves);
 
 	std::cin.get();
 }

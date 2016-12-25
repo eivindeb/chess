@@ -278,7 +278,7 @@ int Board::getLegalMovesInCheck(Move *moves) {
 
 	for (int dir = 0; dir < 8; dir++) {
 		newPos = kingSq + pieceDeltas[KING][dir];
-		if (boardColor[newPos] != boardColor[kingSq]) {
+		if (ON_BOARD(newPos) && boardColor[newPos] != boardColor[kingSq]) {
 			Color colorAtNewPos = boardColor[newPos];
 			boardColor[newPos] = sideToMove;
 			if (!sqIsAttacked(newPos, kingSq)) {
@@ -298,31 +298,36 @@ int Board::getLegalMovesInCheck(Move *moves) {
 	else { // only one attacker
 		newPos = kingSq;
 		int legalSquares[7] = { 0 };
-		int index = 0;
+		int numOfLegalSquares = 0;
 		bool canReachLegalSquare;
-		while ((newPos += dirBySquareDiff[kingSq + attackers[0] + 119]) != attackers[0]) {
-			legalSquares[index++] = newPos;
+		if (board[attackers[0]] != KNIGHT) {
+			while ((newPos += dirBySquareDiff[kingSq - attackers[0] + 119]) != attackers[0]) {
+				legalSquares[numOfLegalSquares++] = newPos;
+			}
 		}
-		legalSquares[index++] = attackers[0];
+		legalSquares[numOfLegalSquares++] = attackers[0];
 
 		// TODO can figure out directions there is no reason to search in, e.g. North and South if king is directly south of attacking piece
 		// instead of checking if in legalSquares, i can check if it is between kingSq and attackerSq and is a multiple of the direction i.e. ( sq > kingSq and sq <= attackerSq and sq % dir == 0)
 
 		for (int sq = 0; sq < 120; sq++) {
 			if (ON_BOARD(sq)) {
-				if (boardColor[sq] == sideToMove && sq != kingSq && !sqIsAttacked(kingSq, sq)) {
+				if (boardColor[sq] == sideToMove && sq != kingSq && !sqIsAttacked(kingSq, sq, attackers[0])) {
 					if (board[sq] == PAWN) {
 						int dirMod = (sideToMove == WHITE) ? 0 : 4;
-						if ((sideToMove == WHITE && sq / 16 == 1) || (sideToMove == BLACK && sq / 16 == 6)) {
-							if (std::any_of(std::begin(legalSquares), std::end(legalSquares), [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 3]; })) {
-								move_add_if_legal(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, 0);
+						if (numOfLegalSquares > 1) {
+							if (((sideToMove == WHITE && sq / 16 == 1) || (sideToMove == BLACK && sq / 16 == 6)) && board[(sq + pieceDeltas[PAWN][dirMod + 3]) / 2] == EMPTY) {
+								if (std::any_of(std::begin(legalSquares), std::prev(std::end(legalSquares)), [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 3]; })) {
+									move_add_if_legal(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, 0);
+								}
+								if (std::any_of(std::begin(legalSquares), std::prev(std::end(legalSquares)), [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 1]; })) {
+									move_add_if_legal(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, EMPTY, 0);
+								}
 							}
 						}
+						
 						if (sq + pieceDeltas[PAWN][dirMod] == attackers[0]) {
 							move_add_if_legal(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[attackers[0]], MFLAGS_CPT + MFLAGS_PAWN_MOVE);
-						}
-						else if (std::any_of(std::begin(legalSquares), std::prev(std::end(legalSquares)), [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 1]; })) {
-							move_add_if_legal(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, EMPTY, 0);
 						}
 						else if (sq + pieceDeltas[PAWN][dirMod + 2] == attackers[0]) {
 							move_add_if_legal(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[attackers[0]], MFLAGS_CPT + MFLAGS_PAWN_MOVE);
@@ -338,7 +343,7 @@ int Board::getLegalMovesInCheck(Move *moves) {
 						continue;
 					}
 					canReachLegalSquare = false;
-					for (int i = 0; i < index; i++) {
+					for (int i = 0; i < numOfLegalSquares; i++) {
 						if (boardColor[sq] == sideToMove && (attackArray[legalSquares[i] - sq + 128] & attackGroups[board[sq]])) {
 							canReachLegalSquare = true;
 							break;
@@ -368,6 +373,9 @@ int Board::getLegalMovesInCheck(Move *moves) {
 										else {
 											move_add_if_legal(moves, numOfMoves++, sq, newPos, board[sq], EMPTY, 0);
 										}
+									}
+									if (board[newPos] != EMPTY) {
+										break;
 									}
 								}
 							}
@@ -519,11 +527,13 @@ void Board::moveUnmake() {
 	halfMoveCount--;
 }
 
-bool Board::sqIsAttacked(int chkdSq, int xRaySq) {
+bool Board::sqIsAttacked(int chkdSq, int xRaySq, int ignoreAttackerOnSq) {
 	int lookupVal;
 	int newPos;
 	Piece xRayPiece;
 	Color xRayColor;
+	Piece ignoredSq;
+	Color ignoredColor;
 	bool isAttacked = false;
 	if (xRaySq != -1) {
 		xRayPiece = board[xRaySq];
@@ -532,7 +542,7 @@ bool Board::sqIsAttacked(int chkdSq, int xRaySq) {
 		boardColor[xRaySq] = NONE;
 	}
 	for (int sq = 0; sq < 120; sq++) {
-		if (sq != chkdSq && ON_BOARD(sq) && board[sq] != EMPTY && (boardColor[chkdSq] != boardColor[sq])) {
+		if (sq != chkdSq && ON_BOARD(sq) && board[sq] != EMPTY && (boardColor[chkdSq] != boardColor[sq]) && sq != ignoreAttackerOnSq) {
 			lookupVal = chkdSq - sq + 128;
 			if (board[sq] == PAWN) {
 				int attackGroup = (boardColor[sq] == WHITE) ? attackGroups[PAWN] - 8 : attackGroups[PAWN] - 4;
@@ -549,7 +559,7 @@ bool Board::sqIsAttacked(int chkdSq, int xRaySq) {
 					}
 					newPos = chkdSq;
 					while ((newPos += dirBySquareDiff[chkdSq - sq + 119]) != sq) {
-						if (board[sq] != EMPTY) {
+						if (board[newPos] != EMPTY) {
 							break;						// TODO maybe use goto for efficiency
 						}
 					}
@@ -569,27 +579,30 @@ bool Board::sqIsAttacked(int chkdSq, int xRaySq) {
 	return isAttacked;
 }
 
-int Board::getSqAttackers(int *attackingSq, int chkdSq) {
+int Board::getSqAttackers(int *attackingSquares, int chkdSq) {
 	int numOfAttackers = 0;
 	int lookupVal;
 	int newPos;
 	for (int sq = 0; sq < 120; sq++) {
-		if (sq != chkdSq && ON_BOARD(sq) && board[sq] != EMPTY && (boardColor[chkdSq] != boardColor[sq])) {
+		if (sq != chkdSq && ON_BOARD(sq) && (boardColor[chkdSq] == boardColor[sq] * (-1))) {
 			lookupVal = chkdSq - sq + 128;
 			if (board[sq] == PAWN) {
 				int attackGroup = (boardColor[sq] == WHITE) ? attackGroups[PAWN] - 8 : attackGroups[PAWN] - 4;
-				if (attackGroup & attackArray[lookupVal]) attackingSq[numOfAttackers++] = sq;
+				if (attackGroup & attackArray[lookupVal]) attackingSquares[numOfAttackers++] = sq;
 			}
 			else {
-				if (attackGroups[board[sq]] & attackArray[lookupVal]) { // piece can attack sq
-					if (board[sq] <= 2) attackingSq[numOfAttackers++] = sq;
+				if (attackArray[lookupVal] & attackGroups[board[sq]]) { // piece can attack sq
+					if (board[sq] <= 2) {
+						attackingSquares[numOfAttackers++] = sq;
+						continue;
+					}
 					newPos = chkdSq;
 					while ((newPos += dirBySquareDiff[chkdSq - sq + 119]) != sq) {
-						if (board[sq] != EMPTY) {
+						if (board[newPos] != EMPTY) {
 							break;						// TODO maybe use goto for efficiency
 						}
 					}
-					if (newPos == sq) attackingSq[numOfAttackers++] = sq;
+					if (newPos == sq) attackingSquares[numOfAttackers++] = sq;
 				}
 			}
 		}
