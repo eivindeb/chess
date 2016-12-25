@@ -26,6 +26,8 @@
 #define MFLAGS_PAWN_DOUBLE	4
 #define MFLAGS_CASTLE_LONG	8
 #define MFLAGS_CASTLE_SHORT	16
+#define MFLAGS_PAWN_MOVE	32
+#define MFLAGS_KING_MOVE	64
 
 #define CASTLE_BOTH		3
 #define CASTLE_SHORT	1
@@ -106,6 +108,7 @@ struct State {
 	int wCastleRights;
 	int bCastleRights;
 	int enPassant;
+	int halfMoveClk;
 };
 
 /* move is on the form:

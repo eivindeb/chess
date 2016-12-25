@@ -9,7 +9,7 @@
 
 int main()
 {	
-	Board myboard = Board();
+	/*Board myboard = Board();
 
 	Move moves[218];
 	int numOfMoves = myboard.getLegalMoves(moves);
@@ -46,7 +46,10 @@ int main()
 	myboard.moveUnmake();
 	myboard.printBoard();
 
-	std::cout << "Square b5 is attacked: " << myboard.sqIsAttacked(65) << std::endl;
+	std::cout << "Square b5 is attacked: " << myboard.sqIsAttacked(65) << std::endl;*/
+
+	Board myboard = Board("rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2");
+	myboard.printBoard();
 
 	std::cin.get();
 }
