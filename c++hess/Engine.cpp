@@ -1,0 +1,116 @@
+#include "stdafx.h"
+#include "Engine.h"
+#include <iostream>
+
+Engine::Engine(int _sideToPlay, int _depth, std::string fen) {
+	sideToPlay = _sideToPlay;
+	depth = _depth;
+
+	if (fen == "") board = Board();
+	else board = Board(fen);
+}
+
+int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
+	if (depthLeft == 0) return board.materialTotal * board.sideToMove;
+
+	int score = 0;
+	Move moves[218];
+	int numOfPieces[7] = { 0, 0, 0, 0, 0, 0, 0 };
+	int numOfPiecesAfter[7] = { 0, 0, 0, 0, 0, 0, 0 };
+	int numOfMoves = board.getLegalMoves(moves);
+	for (int i = 0; i < numOfMoves; i++) {
+		if (i == 0 && depthLeft == 2 && numOfMoves == 28 && alpha == -500 && beta == 200000 && board.halfMoveCount == 8) {
+			numOfPieces[0] = 0;
+		}
+		for (int p = 0; p < 7; p++) {
+			numOfPieces[p] = 0;
+			numOfPiecesAfter[p] = 0;
+		}
+		for (int sq = 0; sq < 120; sq++) {
+			if (ON_BOARD(sq)) {
+				numOfPieces[board.board[sq]]++;
+			}
+		}
+		board.moveMake(moves[i]);
+		if (board.inCheck(Color(board.sideToMove*(-1)))) { // move that puts its own king in check
+			board.moveUnmake();
+			continue;
+		}
+		score = -alphaBeta(-beta, -alpha, depthLeft - 1);
+		board.moveUnmake();
+		for (int sq = 0; sq < 120; sq++) {
+			if (ON_BOARD(sq)) {
+				numOfPiecesAfter[board.board[sq]]++;
+			}
+		}
+		for (int p = 0; p < 7; p++) {
+			if (numOfPieces[p] != numOfPiecesAfter[p]) {
+				std::cout << "shieeet " << p << std::endl;
+			}
+		}
+		if (score >= beta) {
+			return beta;
+		}
+		if (score > alpha) {
+			alpha = score;
+		}
+	}
+
+	return alpha;
+}
+
+int Engine::findBestMove(Move *moves, int numOfMoves) {
+	int score = -10000 * sideToPlay;
+	int prevScore = score;
+	int bestIndex = 0;
+	for (int i = 0; i < numOfMoves; i++) {
+		board.moveMake(moves[i]);
+		if (board.inCheck(Color(board.sideToMove*(-1)))) { // move that puts its own king in check
+			board.moveUnmake();
+			continue;
+		}
+		score = -alphaBeta(-200000, 200000, depth-1)*sideToPlay;
+		board.moveUnmake();
+		board.printBoard();
+		std::cout << std::endl << "On move: " << i << "/" << numOfMoves << ":\t" << moves[i].fromSq << " " << moves[i].toSq;
+		std::cout << "\t(" << SQ_FILE(moves[i].fromSq) << SQ_RANK(moves[i].fromSq) << " " << SQ_FILE(moves[i].toSq) << SQ_RANK(moves[i].toSq) << ")\t" << score << std::endl << std::endl;
+		if (i == 18) {
+			std::cout << "now" << std::endl;
+		}
+		if ((sideToPlay == WHITE && score > prevScore) || (sideToPlay == BLACK && score < prevScore)) {
+			prevScore = score;
+			bestIndex = i;
+		}
+	}
+
+	return bestIndex;
+}
+
+void Engine::playGame() {
+	Move moves[218];
+	int numOfMoves;
+	int moveIndex;
+	board.printBoard();
+	while (1) {
+		if (board.inCheck(board.sideToMove)) {
+			numOfMoves = board.getLegalMovesInCheck(moves);
+			if (numOfMoves == 0) break;
+		}
+		else {
+			numOfMoves = board.getLegalMoves(moves);
+		}
+		if (board.sideToMove == sideToPlay) {
+			moveIndex = findBestMove(moves, numOfMoves);
+		}
+		else {
+			board.printMoves(moves, numOfMoves);
+			std::cin >> moveIndex;
+		}
+		board.moveMake(moves[moveIndex]);
+		std::cout << "Move played: " << moves[moveIndex].fromSq << " " << moves[moveIndex].toSq << "\t(" << SQ_FILE(moves[moveIndex].fromSq) << SQ_RANK(moves[moveIndex].fromSq) << " " << SQ_FILE(moves[moveIndex].toSq) << SQ_RANK(moves[moveIndex].toSq) << ")\t" <<std::endl;
+		board.printBoard();
+	}
+	std::string side = (board.sideToMove == WHITE) ? "Black" : "White";
+	std::cout << side << " won in " << board.halfMoveCount / 2 << " moves!" << std::endl;
+	std::cin.get();
+}

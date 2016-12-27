@@ -3,55 +3,24 @@
 
 #include "stdafx.h"
 #include "Board.h"
+#include "Engine.h"
 #include <iostream>
 #include <string>
 
 
 int main()
 {	
-	/*Board myboard = Board();
-
+	/*
+	Board myboard = Board("r1b1kbnr/pppppppp/8/6R1/8/B4n2/PP1q3P/1N2K1NR w KQkq -");
 	Move moves[218];
-	int numOfMoves = myboard.getLegalMoves(moves);
+	int numOfMoves = myboard.getLegalMovesInCheck(moves);
+	myboard.printBoard();
 	myboard.printMoves(moves, numOfMoves);
-	myboard.printBoard();
-	std::cout << myboard.getFenString() << std::endl;
-	myboard.moveMake(moves[8]);
-	myboard.printBoard();
-
-	std::cout << myboard.getFenString() << std::endl;
-	numOfMoves = myboard.getLegalMoves(moves);
-	myboard.printMoves(moves, numOfMoves);
-	myboard.moveMake(moves[2]);
-	myboard.printBoard();
-
-	std::cout << myboard.getFenString() << std::endl;
-	numOfMoves = myboard.getLegalMoves(moves);
-	myboard.printMoves(moves, numOfMoves);
-	myboard.moveMake(moves[22]);
-	myboard.printBoard();
-
-	std::cout << myboard.getFenString() << std::endl;
-	numOfMoves = myboard.getLegalMoves(moves);
-	myboard.printMoves(moves, numOfMoves);
-	myboard.moveMake(moves[4]);
-	myboard.printBoard();
-
-	std::cout << myboard.getFenString() << std::endl;
-	numOfMoves = myboard.getLegalMoves(moves);
-	myboard.printMoves(moves, numOfMoves);
-	myboard.moveMake(moves[22]);
-	myboard.printBoard();
-
-	myboard.moveUnmake();
-	myboard.printBoard();*/
-
-	Board myboard = Board("rnbqkb1r/pp1ppppp/8/B7/1Q6/4PPNn/PP4PP/R3K2R w KQkq -");
-	Move moves[218];
-	int numOfMoves = myboard.getLegalMoves(moves);
-	myboard.printMoves(moves, numOfMoves);
-	myboard.printBoard();
-
 	std::cin.get();
+	*/
+
+	
+	Engine myengine = Engine(1, 6, "6R1/p1k4p/Q3p3/1PbqPp2/2p2B2/3p3P/8/1K6 w - - 8 5");
+	myengine.playGame();
 }
 

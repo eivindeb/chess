@@ -39,6 +39,8 @@
 #define CASTLE_LONG		2
 
 #define ON_BOARD(SQ)	(SQ & 0x88) == 0
+#define SQ_FILE(SQ)		(char((SQ % 8) + 97))
+#define SQ_RANK(SQ)		(SQ >> 4) + 1
 
 
 
