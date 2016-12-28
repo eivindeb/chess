@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <tchar.h>
 
+#define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
 #define POS_MG	1
 #define POS_EG	2
 
@@ -49,6 +51,9 @@
 
 enum Piece { KING, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY };
 enum Color { WHITE = 1, BLACK = -1, NONE = 0 };
+
+enum Task { TASK_NOTHING, TASK_SEARCH, TASK_PONDER};
+enum Mode { PROTO_NOTHING, PROTO_XBOARD};
 
 static int pieceDeltas[6][8] = {
 	{ NW, NORTH, NE, EAST, SE, SOUTH, SW, WEST }, // king

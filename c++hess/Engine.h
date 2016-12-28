@@ -11,8 +11,8 @@ class Engine {
 		int quiescence(int alpha, int beta);
 		void playGame();
 		int evaluatePosition();
-	private:
 		Board board;
+	private:
 		int depth;
 		int sideToPlay;
 };

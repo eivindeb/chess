@@ -71,7 +71,6 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
 
 int Engine::quiescence(int alpha, int beta) {
 	int standPat = evaluatePosition();
-	return standPat;
 	if (standPat >= beta) {
 		return beta;
 	}
@@ -80,12 +79,26 @@ int Engine::quiescence(int alpha, int beta) {
 	}
 
 	Move moves[218];
+	int materialTotalBefore = 0;
+	int materialTotalAfter = 0;
 	int score = 0;
 	int numOfCaptures = board.getCaptureMoves(moves);
 	for (int i = 0; i < numOfCaptures; i++) {
+		if (moves[i].flags & MFLAGS_PROMOTION) {
+			materialTotalBefore = 0;
+		}
+		materialTotalBefore = board.materialTotal;
 		board.moveMake(moves[i]);
+		if (board.inCheck(Color(board.sideToMove*(-1)))) {
+			board.moveUnmake();
+			continue;
+		}
 		score = -quiescence(-beta, -alpha);
 		board.moveUnmake();
+		materialTotalAfter = board.materialTotal;
+		if (materialTotalAfter != materialTotalBefore) {
+			materialTotalBefore = 0;
+		}
 
 		if (score >= beta) {
 			return beta;
