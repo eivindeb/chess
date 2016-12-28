@@ -10,6 +10,7 @@ class Engine {
 		int alphaBeta(int alpha, int beta, int depthLeft);
 		int quiescence(int alpha, int beta);
 		void playGame();
+		int evaluatePosition();
 	private:
 		Board board;
 		int depth;

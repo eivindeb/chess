@@ -7,179 +7,213 @@
 #include <sstream>
 
 Board::Board(std::string fen) {
-	if (fen == "false") {
+	if (fen != "false") loadFromFen(fen); 
+	else {
+		posFlag = 0;
+		for (int i = 0; i < 18; i++) {
+			pieceCount[i] = 0;
+		}
+		posFlag = POS_MG;
 		Piece backRow[8] = { ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK };
 		for (int i = 0; i < 128; i++) {
 			if (i <= 7) {
-				board[i] = backRow[i];
-				boardColor[i] = WHITE;
+				setSq(i, backRow[i], WHITE);
 			}
 			else if (i >= 112 && i <= 119) {
-				board[i] = backRow[i - 112];
-				boardColor[i] = BLACK;
+				setSq(i, backRow[i - 112], BLACK);
 			}
 			else {
-				board[i] = EMPTY;
-				boardColor[i] = NONE;
+				setSq(i, EMPTY, NONE);
 			}
 		}
 
 		for (int i = 0; i < 8; i++) {
-			board[i + 16] = PAWN;
-			boardColor[i + 16] = WHITE;
-			board[i + 96] = PAWN;
-			boardColor[i + 96] = BLACK;
+			setSq(i + 16, PAWN, WHITE);
+			setSq(i + 96, PAWN, BLACK);
 		}
 
 		sideToMove = WHITE;
 		halfMoveCount = 0;
+		halfMoveClk = 0;
 		enPassant = -1;
 		materialTotal = 0;
 		wCastlingRights = CASTLE_BOTH;
 		bCastlingRights = CASTLE_BOTH;
 		wKingSq = 4;
 		bKingSq = 116;
+
+		for (int i = 0; i < 2; i++) {
+			pieceCount[i * 12] = 1;
+			pieceCount[i * 12 + 1] = 8;
+			pieceCount[i * 12 + 2] = 2;
+			pieceCount[i * 12 + 3] = 2;
+			pieceCount[i * 12 + 4] = 2;
+			pieceCount[i * 12 + 5] = 1;
+		}
+	}
+}
+
+void Board::loadFromFen(std::string fen) {
+	for (int i = 0; i < 18; i++) {
+		pieceCount[i] = 0;
+	}
+
+	posFlag = POS_MG;
+	std::stringstream ss;
+	ss.str(fen);
+	std::string item;
+	std::string fenSplit[6];
+	int index = 0;
+	while (std::getline(ss, item, ' ')) {
+		fenSplit[index++] = item;
+	}
+
+	sideToMove = (fenSplit[1] == "w") ? WHITE : BLACK;
+	wCastlingRights = 0;
+	bCastlingRights = 0;
+
+	for (char& c : fenSplit[2]) {
+		switch (c) {
+		case 'K':
+			wCastlingRights += CASTLE_SHORT;
+			break;
+		case 'k':
+			bCastlingRights += CASTLE_SHORT;
+			break;
+		case 'Q':
+			wCastlingRights += CASTLE_LONG;
+			break;
+		case 'q':
+			bCastlingRights += CASTLE_LONG;
+			break;
+		case '-': // not actually necessary but o'well
+			wCastlingRights = 0;
+			bCastlingRights = 0;
+		}
+	}
+
+	if (fenSplit[3] == "-") {
+		enPassant = -1;
 	}
 	else {
-		std::stringstream ss;
-		ss.str(fen);
-		std::string item;
-		std::string fenSplit[6];
-		int index = 0;
-		while (std::getline(ss, item, ' ')) {
-			fenSplit[index++] = item;
-		}
-
-		sideToMove = (fenSplit[1] == "w") ? WHITE : BLACK;
-		wCastlingRights = 0;
-		bCastlingRights = 0;
-
-		for (char& c : fenSplit[2]) {
-			switch (c) {
-				case 'K':
-					wCastlingRights += CASTLE_SHORT;
-					break;
-				case 'k':
-					bCastlingRights += CASTLE_SHORT;
-					break;
-				case 'Q':
-					wCastlingRights += CASTLE_LONG;
-					break;
-				case 'q':
-					bCastlingRights += CASTLE_LONG;
-					break;
-				case '-': // not actually necessary but o'well
-					wCastlingRights = 0;
-					bCastlingRights = 0;
-			}
-		}
-
-		if (fenSplit[3] == "-") {
-			enPassant = -1;
-		}
-		else {
-			char file = fenSplit[3].at(0);
-			int rank = (fenSplit[3].at(1) - '0');
-			enPassant = (int(file) - 97) + (rank - 1) * 16;
-		}
-
-		if (fenSplit[4] != "") {
-			halfMoveClk = std::stoi(fenSplit[4]);
-		}
-		else {
-			halfMoveClk = 0;
-		}
-
-		if (fenSplit[5] != "") {
-			halfMoveCount = (std::stoi(fenSplit[5]) * 2);
-		}
-		else {
-			halfMoveCount = 0;
-		}
-		if (sideToMove == BLACK) halfMoveCount++;
-
-		materialTotal = 0;
-
-		int sq = 112;
-		for (char& c : fenSplit[0]) {
-			switch (c) {
-				case 'P':
-					board[sq] = PAWN;
-					boardColor[sq] = WHITE;
-					materialTotal += pieceValues[PAWN];
-					break;
-				case 'p':
-					board[sq] = PAWN;
-					boardColor[sq] = BLACK;
-					materialTotal -= pieceValues[PAWN];
-					break;
-				case 'N':
-					board[sq] = KNIGHT;
-					boardColor[sq] = WHITE;
-					materialTotal += pieceValues[KNIGHT];
-					break;
-				case 'n':
-					board[sq] = KNIGHT;
-					boardColor[sq] = BLACK;
-					materialTotal -= pieceValues[KNIGHT];
-					break;
-				case 'B':
-					board[sq] = BISHOP;
-					boardColor[sq] = WHITE;
-					materialTotal += pieceValues[BISHOP];
-					break;
-				case 'b':
-					board[sq] = BISHOP;
-					boardColor[sq] = BLACK;
-					materialTotal -= pieceValues[BISHOP];
-					break;
-				case 'R':
-					board[sq] = ROOK;
-					boardColor[sq] = WHITE;
-					materialTotal += pieceValues[ROOK];
-					break;
-				case 'r':
-					board[sq] = ROOK;
-					boardColor[sq] = BLACK;
-					materialTotal -= pieceValues[ROOK];
-					break;
-				case 'Q':
-					board[sq] = QUEEN;
-					boardColor[sq] = WHITE;
-					materialTotal += pieceValues[QUEEN];
-					break;
-				case 'q':
-					board[sq] = QUEEN;
-					boardColor[sq] = BLACK;
-					materialTotal -= pieceValues[QUEEN];
-					break;
-				case 'K':
-					board[sq] = KING;
-					boardColor[sq] = WHITE;
-					materialTotal += pieceValues[KING];
-					wKingSq = sq;
-					break;
-				case 'k':
-					board[sq] = KING;
-					boardColor[sq] = BLACK;
-					materialTotal -= pieceValues[KING];
-					bKingSq = sq;
-					break;
-				case '/':
-					sq -= 25;
-					break;
-				default: // any number of empty squares
-					for (int i = 0; i < int(c - '0'); i++) {
-						board[sq] = EMPTY;
-						boardColor[sq] = NONE;
-						sq++;
-					}
-					sq--;
-			}
-			sq++;
-		}
+		char file = fenSplit[3].at(0);
+		int rank = (fenSplit[3].at(1) - '0');
+		enPassant = (int(file) - 97) + (rank - 1) * 16;
 	}
+
+	if (fenSplit[4] != "") {
+		halfMoveClk = std::stoi(fenSplit[4]);
+	}
+	else {
+		halfMoveClk = 0;
+	}
+
+	if (fenSplit[5] != "") {
+		halfMoveCount = (std::stoi(fenSplit[5]) * 2);
+	}
+	else {
+		halfMoveCount = 0;
+	}
+	if (sideToMove == BLACK) halfMoveCount++;
+
+	materialTotal = 0;
+
+	int sq = 112;
+	for (char& c : fenSplit[0]) {
+		switch (c) {
+		case 'P':
+			setSq(sq, PAWN, WHITE);
+			materialTotal += pieceValues[PAWN];
+			pieceCount[13]++;
+			break;
+		case 'p':
+			setSq(sq, PAWN, BLACK);
+			materialTotal -= pieceValues[PAWN];
+			pieceCount[1]++;
+			break;
+		case 'N':
+			setSq(sq, KNIGHT, WHITE);
+			materialTotal += pieceValues[KNIGHT];
+			pieceCount[14]++;
+			break;
+		case 'n':
+			setSq(sq, KNIGHT, BLACK);
+			materialTotal -= pieceValues[KNIGHT];
+			pieceCount[2]++;
+			break;
+		case 'B':
+			setSq(sq, BISHOP, WHITE);
+			materialTotal += pieceValues[BISHOP];
+			pieceCount[15]++;
+			break;
+		case 'b':
+			setSq(sq, BISHOP, BLACK);
+			materialTotal -= pieceValues[BISHOP];
+			pieceCount[3]++;
+			break;
+		case 'R':
+			setSq(sq, ROOK, WHITE);
+			materialTotal += pieceValues[ROOK];
+			pieceCount[16]++;
+			break;
+		case 'r':
+			setSq(sq, ROOK, BLACK);
+			materialTotal -= pieceValues[ROOK];
+			pieceCount[4]++;
+			break;
+		case 'Q':
+			setSq(sq, QUEEN, WHITE);
+			materialTotal += pieceValues[QUEEN];
+			pieceCount[17]++;
+			break;
+		case 'q':
+			setSq(sq, QUEEN, BLACK);
+			materialTotal -= pieceValues[QUEEN];
+			pieceCount[5]++;
+			break;
+		case 'K':
+			setSq(sq, KING, WHITE);
+			materialTotal += pieceValues[KING];
+			wKingSq = sq;
+			pieceCount[12]++;
+			break;
+		case 'k':
+			setSq(sq, KING, BLACK);
+			materialTotal -= pieceValues[KING];
+			bKingSq = sq;
+			pieceCount[0]++;
+			break;
+		case '/':
+			sq -= 25;
+			break;
+		default: // any number of empty squares
+			for (int i = 0; i < int(c - '0'); i++) {
+				setSq(sq, EMPTY, NONE);
+				sq++;
+			}
+			sq--;
+		}
+		sq++;
+	}
+	int pieceVal = getSideMaterialValue(WHITE);
+	if (pieceVal <= 1200) {
+		posFlag = POS_EG;
+	}
+	pieceVal = getSideMaterialValue(BLACK);
+	if (pieceVal <= 1200) {
+		posFlag = POS_EG;
+	}
+	setPiecePositionTotal();
 	historyIndex = -1;
+}
+
+int Board::getSideMaterialValue(Color side) {
+	int pieceVal = 0;
+	for (int i = 0; i < 6; i++) {
+		pieceVal += pieceCount[i] * pieceValues[i];
+	}
+
+	return pieceVal;
 }
 
 int Board::getLegalMoves(Move *moves) {
@@ -471,8 +505,9 @@ void Board::moveMake(Move move) { // TODO maybe consider writing captured piece 
 	if (move.flags & MFLAGS_CPT) {
 		halfMoveClk = -1;
 		materialTotal += (pieceValues[move.attackedPiece] * sideToMove);
+		clearSq(move.toSq);
 	}
-	if (move.flags & MFLAGS_PAWN_MOVE) {
+	else if (move.flags & MFLAGS_PAWN_MOVE) { // possible bug source, have else if since at the moment they do the same
 		halfMoveClk = -1;
 	}
 
@@ -496,11 +531,8 @@ void Board::moveMake(Move move) { // TODO maybe consider writing captured piece 
 	}
 
 	else if (move.flags & MFLAGS_CASTLE_LONG) {
-		board[move.toSq + EAST] = ROOK;
-		boardColor[move.toSq + EAST] = boardColor[move.toSq + WEST*2];
-
-		board[move.toSq + WEST*2] = EMPTY;
-		boardColor[move.toSq + WEST*2] = NONE;
+		setSq(move.toSq + EAST, ROOK, sideToMove);
+		clearSq(move.toSq + WEST * 2);
 
 		if (sideToMove == WHITE) {
 			wCastlingRights = 0;
@@ -510,11 +542,9 @@ void Board::moveMake(Move move) { // TODO maybe consider writing captured piece 
 		}
 	}
 	else if (move.flags & MFLAGS_CASTLE_SHORT) {
-		board[move.toSq + WEST] = ROOK;
-		boardColor[move.toSq + WEST] = boardColor[move.toSq+EAST];
+		setSq(move.toSq + WEST, ROOK, sideToMove);
+		clearSq(move.toSq + EAST);
 
-		board[move.toSq + EAST] = EMPTY;
-		boardColor[move.toSq + WEST] = NONE;
 		if (sideToMove == WHITE) {
 			wCastlingRights = 0;
 		}
@@ -522,22 +552,18 @@ void Board::moveMake(Move move) { // TODO maybe consider writing captured piece 
 			bCastlingRights = 0;
 		}
 	}
-	board[move.toSq] = board[move.fromSq];
-	boardColor[move.toSq] = boardColor[move.fromSq];
-	board[move.fromSq] = EMPTY;
-	boardColor[move.fromSq] = NONE;
+
+	setSq(move.toSq, move.movedPiece, boardColor[move.fromSq]);
+	clearSq(move.fromSq);
 
 	if (move.flags & MFLAGS_ENP) {
 		if ((move.toSq % 8) - (move.fromSq % 8) == WEST) {
-			board[move.fromSq + WEST] = EMPTY;
-			boardColor[move.fromSq + WEST] = NONE;
+			clearSq(move.fromSq + WEST);
 		}
 		else {
-			board[move.fromSq + EAST] = EMPTY;
-			boardColor[move.fromSq + EAST] = NONE;
+			clearSq(move.fromSq + EAST);
 		}
 	}
-
 
 	if (move.flags & MFLAGS_PAWN_DOUBLE) {
 		enPassant = (move.fromSq + move.toSq) / 2;
@@ -561,16 +587,12 @@ void Board::moveUnmake() {
 			bKingSq = prevState.move.fromSq;
 		}
 		if (prevState.move.flags & MFLAGS_CASTLE_LONG) {
-			board[prevState.move.toSq + 2 * WEST] = ROOK;
-			boardColor[prevState.move.toSq + 2 * WEST] = boardColor[prevState.move.toSq];
-			board[prevState.move.toSq + EAST] = EMPTY;
-			boardColor[prevState.move.toSq + EAST] = NONE;
+			setSq(prevState.move.toSq + 2 * WEST, ROOK, sideToMove);
+			clearSq(prevState.move.toSq + EAST);
 		}
 		else if (prevState.move.flags & MFLAGS_CASTLE_SHORT) {
-			board[prevState.move.toSq + EAST] = ROOK;
-			boardColor[prevState.move.toSq + EAST] = boardColor[prevState.move.toSq];
-			board[prevState.move.toSq + WEST] = EMPTY;
-			boardColor[prevState.move.toSq + WEST] = NONE;
+			setSq(prevState.move.toSq + EAST, ROOK, sideToMove);
+			clearSq(prevState.move.toSq + WEST);
 		}
 	}
 	if (prevState.move.flags & MFLAGS_PROMOTION) {
@@ -587,37 +609,384 @@ void Board::moveUnmake() {
 			materialTotal += (pieceValues[KNIGHT] - pieceValues[PAWN])*sideToMove;
 		}
 	}
+	clearSq(prevState.move.toSq); // must clear first to remove position value of piece
 	if (prevState.move.flags & MFLAGS_CPT) {
 		materialTotal -= (pieceValues[prevState.move.attackedPiece] * sideToMove);
 		if (prevState.move.flags & MFLAGS_ENP) {
 			if ((prevState.move.toSq % 8) - (prevState.move.fromSq % 8) == WEST) {
-				board[prevState.move.fromSq + WEST] = PAWN;
-				boardColor[prevState.move.fromSq + WEST] = Color(sideToMove*(-1));
+				setSq(prevState.move.fromSq + WEST, PAWN, Color(sideToMove*(-1)));
 			}
 			else {
-				board[prevState.move.fromSq + EAST] = PAWN;
-				boardColor[prevState.move.fromSq + EAST] = Color(sideToMove*(-1));
+				setSq(prevState.move.fromSq + EAST, PAWN, Color(sideToMove*(-1)));
 			}
-			board[prevState.move.toSq] = EMPTY;
-			boardColor[prevState.move.toSq] = NONE;
+			clearSq(prevState.move.toSq);
 		}
 		else {
-			board[prevState.move.toSq] = prevState.move.attackedPiece;
-			boardColor[prevState.move.toSq] = Color(sideToMove*(-1));
+			setSq(prevState.move.toSq, prevState.move.attackedPiece, Color(sideToMove*(-1)));
 		}
 	}
-	else {
-		board[prevState.move.toSq] = EMPTY;
-		boardColor[prevState.move.toSq] = NONE;
-	}
-	board[prevState.move.fromSq] = prevState.move.movedPiece;
-	boardColor[prevState.move.fromSq] = sideToMove;
+
+	setSq(prevState.move.fromSq, prevState.move.movedPiece, sideToMove);
 
 	wCastlingRights = prevState.wCastleRights;
 	bCastlingRights = prevState.bCastleRights;
 	enPassant = prevState.enPassant;
 	halfMoveClk = prevState.halfMoveClk;
 	halfMoveCount--;
+}
+
+int Board::calculatePositionTotal() {
+	int posTotal = 0;
+	int *tablePtr;
+	for (int sq = 0; sq < 120; sq++) {
+		if (ON_BOARD(sq)) {
+			if (board[sq] != EMPTY) {
+				switch (board[sq]) {
+				case PAWN:
+					if (posFlag & POS_MG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnMG : PSTbPawnMG;
+					}
+					else if (posFlag & POS_EG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnEG : PSTbPawnEG;
+					}
+					else {
+						tablePtr = PSTwPawnMG;
+						throw "Unknown position flag";
+					}
+					break;
+				case KNIGHT:
+					if (posFlag & POS_MG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightMG : PSTbKnightMG;
+					}
+					else if (posFlag & POS_EG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightEG : PSTbKnightEG;
+					}
+					else {
+						tablePtr = PSTwPawnMG;
+						throw "Unknown position flag";
+					}
+					break;
+				case BISHOP:
+					if (posFlag & POS_MG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopMG : PSTbBishopMG;
+					}
+					else if (posFlag & POS_EG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopEG : PSTbBishopEG;
+					}
+					else {
+						tablePtr = PSTwPawnMG;
+						throw "Unknown position flag";
+					}
+					break;
+				case ROOK:
+					if (posFlag & POS_MG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwRookMG : PSTbRookMG;
+					}
+					else if (posFlag & POS_EG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwRookEG : PSTbRookEG;
+					}
+					else {
+						tablePtr = PSTwPawnMG;
+						throw "Unknown position flag";
+					}
+					break;
+				case QUEEN:
+					if (posFlag & POS_MG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenMG : PSTbQueenMG;
+					}
+					else if (posFlag & POS_EG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenEG : PSTbQueenEG;
+					}
+					else {
+						tablePtr = PSTwPawnMG;
+						throw "Unknown position flag";
+					}
+					break;
+				case KING:
+					if (posFlag & POS_MG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwKingMG : PSTbKingMG;
+					}
+					else if (posFlag & POS_EG) {
+						tablePtr = (boardColor[sq] == WHITE) ? PSTwKingEG : PSTbKingEG;
+					}
+					else {
+						tablePtr = PSTwPawnMG;
+						throw "Unknown position flag";
+					}
+					break;
+				default:
+					tablePtr = PSTwPawnMG;
+					throw "Unkown piece type";
+				}
+				posTotal += (tablePtr[sq] * boardColor[sq]);
+			}
+		}
+	}
+
+	return posTotal;
+}
+
+inline void Board::clearSq(int sq) {
+	if (board[sq] != EMPTY) {
+		int *tablePtr;
+		switch (board[sq]) {
+		case PAWN:
+			if (posFlag & POS_MG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnMG : PSTbPawnMG;
+			}
+			else if (posFlag & POS_EG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnEG : PSTbPawnEG;
+			}
+			else {
+				tablePtr = PSTwPawnMG;
+				throw "Unknown position flag";
+			}
+			break;
+		case KNIGHT:
+			if (posFlag & POS_MG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightMG : PSTbKnightMG;
+			}
+			else if (posFlag & POS_EG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightEG : PSTbKnightEG;
+			}
+			else {
+				tablePtr = PSTwPawnMG;
+				throw "Unknown position flag";
+			}
+			break;
+		case BISHOP:
+			if (posFlag & POS_MG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopMG : PSTbBishopMG;
+			}
+			else if (posFlag & POS_EG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopEG : PSTbBishopEG;
+			}
+			else {
+				tablePtr = PSTwPawnMG;
+				throw "Unknown position flag";
+			}
+			break;
+		case ROOK:
+			if (posFlag & POS_MG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwRookMG : PSTbRookMG;
+			}
+			else if (posFlag & POS_EG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwRookEG : PSTbRookEG;
+			}
+			else {
+				tablePtr = PSTwPawnMG;
+				throw "Unknown position flag";
+			}
+			break;
+		case QUEEN:
+			if (posFlag & POS_MG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenMG : PSTbQueenMG;
+			}
+			else if (posFlag & POS_EG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenEG : PSTbQueenEG;
+			}
+			else {
+				tablePtr = PSTwPawnMG;
+				throw "Unknown position flag";
+			}
+			break;
+		case KING:
+			if (posFlag & POS_MG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwKingMG : PSTbKingMG;
+			}
+			else if (posFlag & POS_EG) {
+				tablePtr = (boardColor[sq] == WHITE) ? PSTwKingEG : PSTbKingEG;
+			}
+			else {
+				tablePtr = PSTwPawnMG;
+				throw "Unknown position flag";
+			}
+			break;
+		default:
+			tablePtr = PSTwPawnEG;
+			throw "Unknown piece type";
+		}
+		positionTotal -= boardColor[sq] * tablePtr[sq];
+	}
+	
+	board[sq] = EMPTY;
+	boardColor[sq] = NONE;
+}
+
+inline void Board::setSq(int sq, Piece piece, Color side) {
+	if (piece != EMPTY) {
+		int *tablePtr;
+		switch (piece) {
+			case PAWN:
+				if (posFlag & POS_MG) {
+					tablePtr = (side == WHITE) ? PSTwPawnMG : PSTbPawnMG;
+				}
+				else if (posFlag & POS_EG) {
+					tablePtr = (side == WHITE) ? PSTwPawnEG : PSTbPawnEG;
+				}
+				else {
+					tablePtr = PSTwPawnMG;
+					throw "Unknown position flag";
+				}
+				break;
+			case KNIGHT:
+				if (posFlag & POS_MG) {
+					tablePtr = (side == WHITE) ? PSTwKnightMG : PSTbKnightMG;
+				}
+				else if (posFlag & POS_EG) {
+					tablePtr = (side == WHITE) ? PSTwKnightEG : PSTbKnightEG;
+				}
+				else {
+					tablePtr = PSTwPawnMG;
+					throw "Unknown position flag";
+				}
+				break;
+			case BISHOP:
+				if (posFlag & POS_MG) {
+					tablePtr = (side == WHITE) ? PSTwBishopMG : PSTbBishopMG;
+				}
+				else if (posFlag & POS_EG) {
+					tablePtr = (side == WHITE) ? PSTwBishopEG : PSTbBishopEG;
+				}
+				else {
+					tablePtr = PSTwPawnMG;
+					throw "Unknown position flag";
+				}
+				break;
+			case ROOK:
+				if (posFlag & POS_MG) {
+					tablePtr = (side == WHITE) ? PSTwRookMG : PSTbRookMG;
+				}
+				else if (posFlag & POS_EG) {
+					tablePtr = (side == WHITE) ? PSTwRookEG : PSTbRookEG;
+				}
+				else {
+					tablePtr = PSTwPawnMG;
+					throw "Unknown position flag";
+				}
+				break;
+			case QUEEN:
+				if (posFlag & POS_MG) {
+					tablePtr = (side == WHITE) ? PSTwQueenMG : PSTbQueenMG;
+				}
+				else if (posFlag & POS_EG) {
+					tablePtr = (side == WHITE) ? PSTwQueenEG : PSTbQueenEG;
+				}
+				else {
+					tablePtr = PSTwPawnMG;
+					throw "Unknown position flag";
+				}
+				break;
+			case KING:
+				if (posFlag & POS_MG) {
+					tablePtr = (side == WHITE) ? PSTwKingMG : PSTbKingMG;
+				}
+				else if (posFlag & POS_EG) {
+					tablePtr = (side == WHITE) ? PSTwKingEG : PSTbKingEG;
+				}
+				else {
+					tablePtr = PSTwPawnMG;
+					throw "Unknown position flag";
+				}
+				break;
+			default:
+				tablePtr = PSTwPawnEG;
+				throw "Unknown piece type";
+			}
+		positionTotal += side * tablePtr[sq];
+	}
+
+	board[sq] = piece;
+	boardColor[sq] = side;
+}
+
+inline void Board::setPiecePositionTotal() {
+	positionTotal = 0;
+	int *tablePtr;
+	for (int sq = 0; sq < 120; sq++) {
+		if (ON_BOARD(sq)) {
+			if (board[sq] != EMPTY) {
+				switch (board[sq]) {
+					case PAWN:
+						if (posFlag & POS_MG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnMG : PSTbPawnMG;
+						}
+						else if (posFlag & POS_EG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnEG : PSTbPawnEG;
+						}
+						else {
+							tablePtr = PSTwPawnMG;
+							throw "Unknown position flag";
+						}
+						break;
+					case KNIGHT:
+						if (posFlag & POS_MG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightMG : PSTbKnightMG;
+						}
+						else if (posFlag & POS_EG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightEG : PSTbKnightEG;
+						}
+						else {
+							tablePtr = PSTwPawnMG;
+							throw "Unknown position flag";
+						}
+						break;
+					case BISHOP:
+						if (posFlag & POS_MG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopMG : PSTbBishopMG;
+						}
+						else if (posFlag & POS_EG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopEG : PSTbBishopEG;
+						}
+						else {
+							tablePtr = PSTwPawnMG;
+							throw "Unknown position flag";
+						}
+						break;
+					case ROOK:
+						if (posFlag & POS_MG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwRookMG : PSTbRookMG;
+						}
+						else if (posFlag & POS_EG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwRookEG : PSTbRookEG;
+						}
+						else {
+							tablePtr = PSTwPawnMG;
+							throw "Unknown position flag";
+						}
+						break;
+					case QUEEN:
+						if (posFlag & POS_MG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenMG : PSTbQueenMG;
+						}
+						else if (posFlag & POS_EG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenEG : PSTbQueenEG;
+						}
+						else {
+							tablePtr = PSTwPawnMG;
+							throw "Unknown position flag";
+						}
+						break;
+					case KING:
+						if (posFlag & POS_MG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwKingMG : PSTbKingMG;
+						}
+						else if (posFlag & POS_EG) {
+							tablePtr = (boardColor[sq] == WHITE) ? PSTwKingEG : PSTbKingEG;
+						}
+						else {
+							tablePtr = PSTwPawnMG;
+							throw "Unknown position flag";
+						}
+						break;
+					default:
+						tablePtr = PSTwPawnMG;
+						throw "Unkown piece type";
+				}
+				positionTotal += (tablePtr[sq] * boardColor[sq]);
+			}
+		}
+	}
 }
 
 bool Board::inCheck(Color side) {

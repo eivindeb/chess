@@ -20,7 +20,7 @@ int main()
 	*/
 
 	
-	Engine myengine = Engine(1, 6, "6R1/p1k4p/Q3p3/1PbqPp2/2p2B2/3p3P/8/1K6 w - - 8 5");
+	Engine myengine = Engine(1, 6);
 	myengine.playGame();
 }
 
