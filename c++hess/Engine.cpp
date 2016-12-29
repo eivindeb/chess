@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Engine.h"
 #include <iostream>
+#include <algorithm>
 
 Engine::Engine(int _sideToPlay, int _depth, std::string fen) {
 	sideToPlay = _sideToPlay;
@@ -22,9 +23,6 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
 	int numOfMoves = board.getLegalMoves(moves);
 	for (int i = 0; i < numOfMoves; i++) {
 		posValBefore = board.positionTotal;
-		if (posValBefore == -26 && numOfMoves == 30 && i == 0 && alpha == 179 && beta == 200000 && depthLeft == 1) {
-			posValBefore = -26;
-		}
 		/*if (i == 0 && depthLeft == 2 && numOfMoves == 28 && alpha == -500 && beta == 200000 && board.halfMoveCount == 8) {
 			numOfPieces[0] = 0;
 		}
@@ -78,16 +76,15 @@ int Engine::quiescence(int alpha, int beta) {
 		alpha = standPat;
 	}
 
+	//TODO might have to check for in check here??
 	Move moves[218];
-	int materialTotalBefore = 0;
-	int materialTotalAfter = 0;
 	int score = 0;
 	int numOfCaptures = board.getCaptureMoves(moves);
+	mvvLva(moves, numOfCaptures);
 	for (int i = 0; i < numOfCaptures; i++) {
-		if (moves[i].flags & MFLAGS_PROMOTION) {
-			materialTotalBefore = 0;
+		if (!(board.posFlag & POS_EG) && !(moves[i].flags & MFLAGS_PROMOTION) && standPat + pieceValues[moves[i].attackedPiece] + 200 < alpha) { // delta pruning
+			continue;
 		}
-		materialTotalBefore = board.materialTotal;
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) {
 			board.moveUnmake();
@@ -95,10 +92,6 @@ int Engine::quiescence(int alpha, int beta) {
 		}
 		score = -quiescence(-beta, -alpha);
 		board.moveUnmake();
-		materialTotalAfter = board.materialTotal;
-		if (materialTotalAfter != materialTotalBefore) {
-			materialTotalBefore = 0;
-		}
 
 		if (score >= beta) {
 			return beta;
@@ -109,6 +102,13 @@ int Engine::quiescence(int alpha, int beta) {
 	}
 
 	return alpha;
+}
+
+inline void Engine::mvvLva(Move *moves, int numOfMoves) {
+	std::sort(moves, moves + numOfMoves, [](Move &lhs, Move &rhs) {int attackerLhs = (lhs.movedPiece == KING) ? 6 : lhs.movedPiece;
+																	int attackerRhs = (rhs.movedPiece == KING) ? 6 : rhs.movedPiece;
+																		return lhs.attackedPiece > rhs.attackedPiece || 
+																		(lhs.attackedPiece == rhs.attackedPiece && attackerLhs < attackerRhs); });
 }
 
 int Engine::evaluatePosition() {
@@ -150,6 +150,7 @@ int Engine::findBestMove(Move *moves, int numOfMoves) {
 		}
 	}
 
+	std::cout << "Highest score: " << prevScore << std::endl;
 	return bestIndex;
 }
 

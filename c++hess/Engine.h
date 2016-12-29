@@ -12,6 +12,7 @@ class Engine {
 		void playGame();
 		int evaluatePosition();
 		Board board;
+		void mvvLva(Move *moves, int numOfMoves);
 	private:
 		int depth;
 		int sideToPlay;

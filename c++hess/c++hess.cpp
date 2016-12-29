@@ -12,7 +12,7 @@
 int main()
 {	
 	//Com com = Com();
-	Engine myengine = Engine(1, 6);
+	Engine myengine = Engine(1, 4);
 
 	/*
 	Board myboard = Board("r1b1kbnr/pppppppp/8/6R1/8/B4n2/PP1q3P/1N2K1NR w KQkq -");

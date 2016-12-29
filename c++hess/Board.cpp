@@ -624,7 +624,7 @@ void Board::moveUnmake() {
 			materialTotal -= (pieceValues[BISHOP] - pieceValues[PAWN])*sideToMove;
 		}
 		else if (prevState.move.flags & MFLAGS_PROMOTION_KNIGHT) {
-			materialTotal += (pieceValues[KNIGHT] - pieceValues[PAWN])*sideToMove;
+			materialTotal -= (pieceValues[KNIGHT] - pieceValues[PAWN])*sideToMove;
 		}
 	}
 	clearSq(prevState.move.toSq); // must clear first to remove position value of piece
