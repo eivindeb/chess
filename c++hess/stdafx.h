@@ -395,6 +395,14 @@ struct State {
 	int halfMoveClk;
 };
 
+struct Zobrist {
+	unsigned long long pieces[6][2][120];
+	unsigned long long side;
+	unsigned long long wCastlingRights[4]; // 0 (NONE), CASTLE_SHORT, CASTLE_LONG, , CASTLE_BOTH
+	unsigned long long bCastlingRights[4];
+	unsigned long long enPassant[8];
+};
+
 /* move is on the form:
 	initial square	(0-6 bit)
 	target square	(7-13 bit)

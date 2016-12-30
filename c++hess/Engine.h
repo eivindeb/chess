@@ -9,11 +9,10 @@ class Engine {
 		int findBestMove(Move *moves, int numOfMoves);
 		int alphaBeta(int alpha, int beta, int depthLeft);
 		int quiescence(int alpha, int beta);
-		void playGame();
 		int evaluatePosition();
 		Board board;
 		void mvvLva(Move *moves, int numOfMoves);
+		int sideToPlay;
 	private:
 		int depth;
-		int sideToPlay;
 };

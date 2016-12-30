@@ -153,32 +153,3 @@ int Engine::findBestMove(Move *moves, int numOfMoves) {
 	std::cout << "Highest score: " << prevScore << std::endl;
 	return bestIndex;
 }
-
-void Engine::playGame() {
-	Move moves[218];
-	int numOfMoves;
-	int moveIndex;
-	board.printBoard();
-	while (1) {
-		if (board.inCheck(board.sideToMove)) {
-			numOfMoves = board.getLegalMovesInCheck(moves);
-			if (numOfMoves == 0) break;
-		}
-		else {
-			numOfMoves = board.getLegalMoves(moves);
-		}
-		if (board.sideToMove == sideToPlay) {
-			moveIndex = findBestMove(moves, numOfMoves);
-		}
-		else {
-			board.printMoves(moves, numOfMoves);
-			std::cin >> moveIndex;
-		}
-		board.moveMake(moves[moveIndex]);
-		std::cout << "Move played: " << moves[moveIndex].fromSq << " " << moves[moveIndex].toSq << "\t(" << SQ_FILE(moves[moveIndex].fromSq) << SQ_RANK(moves[moveIndex].fromSq) << " " << SQ_FILE(moves[moveIndex].toSq) << SQ_RANK(moves[moveIndex].toSq) << ")\t" <<std::endl;
-		board.printBoard();
-	}
-	std::string side = (board.sideToMove == WHITE) ? "Black" : "White";
-	std::cout << side << " won in " << board.halfMoveCount / 2 << " moves!" << std::endl;
-	std::cin.get();
-}

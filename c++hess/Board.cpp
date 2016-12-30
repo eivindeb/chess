@@ -7,6 +7,26 @@
 #include <sstream>
 
 Board::Board(std::string fen) {
+	for (int sq = 0; sq < 120; sq++) {
+		if (ON_BOARD(sq)) {
+			for (int piece = 0; piece < 6; piece++) {
+				zobrist.pieces[piece][0][sq] = rand64();
+				zobrist.pieces[piece][1][sq] = rand64();
+			}
+		}
+	}
+
+	for (int i = 0; i < 4; i++) {
+		zobrist.wCastlingRights[i] = rand64();
+		zobrist.bCastlingRights[i] = rand64();
+	}
+
+	for (int i = 0; i < 8; i++) {
+		zobrist.enPassant[i] = rand64();
+	}
+
+	zobrist.side = rand64();
+
 	if (fen != "false") loadFromFen(fen); 
 	else loadFromFen(START_FEN);
 }
@@ -16,6 +36,7 @@ void Board::loadFromFen(std::string fen) {
 		pieceCount[i] = 0;
 	}
 
+	zobristKey = 0;
 	posFlag = POS_MG;
 	std::stringstream ss;
 	ss.str(fen);
@@ -26,7 +47,13 @@ void Board::loadFromFen(std::string fen) {
 		fenSplit[index++] = item;
 	}
 
-	sideToMove = (fenSplit[1] == "w") ? WHITE : BLACK;
+	if (fenSplit[1] == "w") {
+		sideToMove = WHITE;
+	}
+	else {
+		sideToMove = BLACK;
+		zobristKey ^= zobrist.side;
+	}
 	wCastlingRights = 0;
 	bCastlingRights = 0;
 
@@ -49,6 +76,8 @@ void Board::loadFromFen(std::string fen) {
 			bCastlingRights = 0;
 		}
 	}
+	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
+	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
 
 	if (fenSplit[3] == "-") {
 		enPassant = -1;
@@ -57,6 +86,7 @@ void Board::loadFromFen(std::string fen) {
 		char file = fenSplit[3].at(0);
 		int rank = (fenSplit[3].at(1) - '0');
 		enPassant = (int(file) - 97) + (rank - 1) * 16;
+		zobristKey ^= zobrist.enPassant[enPassant % 8];
 	}
 
 	if (fenSplit[4] != "") {
@@ -499,6 +529,9 @@ void Board::moveMake(Move move) { // TODO maybe consider writing captured piece 
 			bKingSq = move.toSq;
 		}
 	}
+	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
+	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
+
 	switch (move.fromSq) {
 		case 0: wCastlingRights &= ~CASTLE_LONG; break;
 		case 4: wCastlingRights &= ~CASTLE_BOTH; break;
@@ -585,18 +618,28 @@ void Board::moveMake(Move move) { // TODO maybe consider writing captured piece 
 
 	if (move.flags & MFLAGS_PAWN_DOUBLE) {
 		enPassant = (move.fromSq + move.toSq) / 2;
+		zobristKey ^= zobrist.enPassant[enPassant % 8];
 	} else if (enPassant != -1) {
+		zobristKey ^= zobrist.enPassant[enPassant % 8];
 		enPassant = -1;
 	}
 
 	halfMoveCount++;
 	halfMoveClk++;
 	sideToMove = Color(sideToMove*(-1));
+	zobristKey ^= zobrist.side;
+	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
+	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
 }
 
 void Board::moveUnmake() {
 	State prevState = history[historyIndex--];
 	sideToMove = Color(sideToMove*(-1));
+	zobristKey ^= zobrist.side;
+	if (enPassant != -1) zobristKey ^= zobrist.enPassant[enPassant % 8];
+	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
+	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
+
 	if (prevState.move.movedPiece == KING) {
 		if (boardColor[prevState.move.toSq] == WHITE) {
 			wKingSq = prevState.move.fromSq;
@@ -651,6 +694,9 @@ void Board::moveUnmake() {
 	enPassant = prevState.enPassant;
 	halfMoveClk = prevState.halfMoveClk;
 	halfMoveCount--;
+	if (enPassant != -1) zobristKey ^= zobrist.enPassant[enPassant % 8];
+	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
+	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
 }
 
 int Board::calculatePositionTotal() {
@@ -826,8 +872,9 @@ inline void Board::clearSq(int sq) {
 		}
 		pieceCount[board[sq] + 6 * boardColor[sq] + 6]--;
 		positionTotal -= boardColor[sq] * tablePtr[sq];
+		int side = boardColor[sq] == WHITE ? 1 : 0;
+		zobristKey ^= zobrist.pieces[board[sq]][side][sq];
 	}
-	
 	board[sq] = EMPTY;
 	boardColor[sq] = NONE;
 }
@@ -914,8 +961,9 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 			}
 		pieceCount[piece + 6 * side + 6]++;
 		positionTotal += side * tablePtr[sq];
+		int sqSide = side == WHITE ? 1 : 0;
+		zobristKey ^= zobrist.pieces[board[sq]][sqSide][sq];
 	}
-
 	board[sq] = piece;
 	boardColor[sq] = side;
 }
@@ -1260,4 +1308,12 @@ std::string Board::getFenString() {
 	fen += std::to_string(int(halfMoveCount / 2) + 1);
 
 	return fen;
+}
+
+/* function taken from Sungorus chess engine */
+inline unsigned long long Board::rand64() {
+	static unsigned long long next = 1;
+
+	next = next * 1103515245 + 12345;
+	return next;
 }

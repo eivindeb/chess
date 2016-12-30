@@ -12,7 +12,7 @@
 int main()
 {	
 	//Com com = Com();
-	Engine myengine = Engine(1, 4);
+	Engine myengine = Engine(0, 4);
 
 	/*
 	Board myboard = Board("r1b1kbnr/pppppppp/8/6R1/8/B4n2/PP1q3P/1N2K1NR w KQkq -");
@@ -37,6 +37,38 @@ int main()
 				break;
 		}
 	}*/
-	myengine.playGame();
+	Move moves[218];
+	int numOfMoves;
+	int moveIndex;
+	myengine.board.printBoard();
+	while (1) {
+		if (myengine.board.inCheck(myengine.board.sideToMove)) {
+			numOfMoves = myengine.board.getLegalMovesInCheck(moves);
+			if (numOfMoves == 0) break;
+		}
+		else {
+			numOfMoves = myengine.board.getLegalMoves(moves);
+		}
+		if (myengine.board.sideToMove == myengine.sideToPlay) {
+			moveIndex = myengine.findBestMove(moves, numOfMoves);
+		}
+		else {
+			myengine.board.printMoves(moves, numOfMoves);
+			std::cin >> moveIndex;
+		}
+		if (moveIndex == -1) {
+			std::cout << "Undid last move" << std::endl;
+			myengine.board.moveUnmake();
+			myengine.board.printBoard();
+		}
+		else {
+			myengine.board.moveMake(moves[moveIndex]);
+			std::cout << "Move played: " << moves[moveIndex].fromSq << " " << moves[moveIndex].toSq << "\t(" << SQ_FILE(moves[moveIndex].fromSq) << SQ_RANK(moves[moveIndex].fromSq) << " " << SQ_FILE(moves[moveIndex].toSq) << SQ_RANK(moves[moveIndex].toSq) << ")\t" << std::endl;
+			myengine.board.printBoard();
+		}
+	}
+	std::string side = (myengine.board.sideToMove == WHITE) ? "Black" : "White";
+	std::cout << side << " won in " << myengine.board.halfMoveCount / 2 << " moves!" << std::endl;
+	std::cin.get();
 }
 

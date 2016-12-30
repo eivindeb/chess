@@ -32,6 +32,8 @@ class Board {
 		int posFlag;
 		int calculatePositionTotal();
 		void loadFromFen(std::string fen);
+		Zobrist zobrist;
+		unsigned long long zobristKey;
 	private:
 		void move_add_if_legal(Move *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int flags);
 		int wKingSq;
@@ -39,4 +41,5 @@ class Board {
 		void setPiecePositionTotal();
 		void clearSq(int sq);
 		void setSq(int sq, Piece piece, Color side);
+		unsigned long long rand64();
 };
