@@ -360,17 +360,17 @@ int Board::getLegalMovesInCheck(Move *moves) {
 						if (numOfLegalSquares > 1) {
 							if (((sideToMove == WHITE && sq / 16 == 1) || (sideToMove == BLACK && sq / 16 == 6)) && board[(sq + pieceDeltas[PAWN][dirMod + 1])] == EMPTY) {
 								if (std::any_of(legalSquares, legalSquares + numOfLegalSquares - 1, [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 3]; })) {
-									move_add_if_legal(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, MFLAGS_PAWN_DOUBLE + MFLAGS_PAWN_MOVE);
+									moves[numOfMoves++] = Move{ sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, MFLAGS_PAWN_MOVE + MFLAGS_PAWN_DOUBLE, numOfMoves };
 								}
-								if (std::any_of((legalSquares), legalSquares + numOfLegalSquares - 1, [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 1]; })) {
-									if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-										numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod + 1], EMPTY, 0);
-									}
-									else {
-										move_add_if_legal(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, EMPTY, MFLAGS_PAWN_MOVE);
-									}
+							}
+							if (std::any_of((legalSquares), legalSquares + numOfLegalSquares - 1, [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 1]; })) {
+								if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
+									numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod + 1], EMPTY, 0);
+								}
+								else {
+									moves[numOfMoves++] = Move{ sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, EMPTY, MFLAGS_PAWN_MOVE, numOfMoves };
+								}
 									
-								}
 							}
 						}
 						
@@ -515,8 +515,8 @@ int Board::getCaptureMoves(Move *moves) {
 	return movesInPosition;
 }
 
-void Board::move_add_if_legal(Move *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int flags) {
-		moves[moveNum] = Move{ squareFrom, squareTo, movedPiece, attacked, flags };
+inline void Board::moveAdd(Move *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int flags, int id) {
+		moves[moveNum] = Move{ static_cast<uint8_t>(squareFrom), static_cast<uint8_t>(squareTo), movedPiece, attacked, flags, static_cast<uint8_t>(id)};
 }
 
 void Board::moveMake(Move move) { // TODO maybe consider writing captured piece here instead of in each move add if that is more efficient
@@ -531,6 +531,7 @@ void Board::moveMake(Move move) { // TODO maybe consider writing captured piece 
 	}
 	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
+	if (enPassant != -1) zobristKey ^= zobrist.enPassant[enPassant % 8];
 
 	switch (move.fromSq) {
 		case 0: wCastlingRights &= ~CASTLE_LONG; break;
@@ -620,7 +621,6 @@ void Board::moveMake(Move move) { // TODO maybe consider writing captured piece 
 		enPassant = (move.fromSq + move.toSq) / 2;
 		zobristKey ^= zobrist.enPassant[enPassant % 8];
 	} else if (enPassant != -1) {
-		zobristKey ^= zobrist.enPassant[enPassant % 8];
 		enPassant = -1;
 	}
 
@@ -630,6 +630,29 @@ void Board::moveMake(Move move) { // TODO maybe consider writing captured piece 
 	zobristKey ^= zobrist.side;
 	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
+	//if (zobristKey != getZobristKey()) {
+	//	move.flags = 0;
+	//}
+}
+
+unsigned long long Board::getZobristKey() {
+	unsigned long long key = 0;
+	if (sideToMove == BLACK) {
+		key ^= zobrist.side;
+	}
+	for (int sq = 0; sq < 120; sq++) {
+		if (ON_BOARD(sq) && board[sq] != EMPTY) {
+			int color = (boardColor[sq] == WHITE) ? 1 : 0;
+			key ^= zobrist.pieces[board[sq]][color][sq];
+		}
+	}
+	key ^= zobrist.wCastlingRights[wCastlingRights];
+	key ^= zobrist.bCastlingRights[bCastlingRights];
+	if (enPassant != -1) {
+		key ^= zobrist.enPassant[enPassant % 8];
+	}
+	
+	return key;
 }
 
 void Board::moveUnmake() {
@@ -697,6 +720,9 @@ void Board::moveUnmake() {
 	if (enPassant != -1) zobristKey ^= zobrist.enPassant[enPassant % 8];
 	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
+	//if (zobristKey != getZobristKey()) {
+	//	prevState.move.flags = 0;
+	//}
 }
 
 int Board::calculatePositionTotal() {
@@ -962,7 +988,7 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 		pieceCount[piece + 6 * side + 6]++;
 		positionTotal += side * tablePtr[sq];
 		int sqSide = side == WHITE ? 1 : 0;
-		zobristKey ^= zobrist.pieces[board[sq]][sqSide][sq];
+		zobristKey ^= zobrist.pieces[piece][sqSide][sq];
 	}
 	board[sq] = piece;
 	boardColor[sq] = side;
