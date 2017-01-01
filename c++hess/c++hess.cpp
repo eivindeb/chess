@@ -12,7 +12,7 @@
 int main()
 {	
 	//Com com = Com();
-	Engine myengine = Engine(0, 4);
+	Engine myengine = Engine(2, 5);
 
 	/*
 	Board myboard = Board("r1b1kbnr/pppppppp/8/6R1/8/B4n2/PP1q3P/1N2K1NR w KQkq -");
@@ -49,8 +49,8 @@ int main()
 		else {
 			numOfMoves = myengine.board.getLegalMoves(moves);
 		}
-		if (myengine.board.sideToMove == myengine.sideToPlay) {
-			moveIndex = myengine.findBestMove(moves, numOfMoves);
+		if (myengine.board.sideToMove == myengine.sideToPlay || myengine.sideToPlay == 2) {
+			moveIndex = myengine.iterativeDeepening();
 		}
 		else {
 			myengine.board.printMoves(moves, numOfMoves);
