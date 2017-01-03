@@ -6,7 +6,7 @@ class Board {
 		Piece board[128];
 		Color boardColor[128];
 		Color sideToMove;
-		State history[100]; // max search depth
+		State history[1024]; // max search depth
 		int pieceCount[18];
 		int historyIndex;
 		int wCastlingRights;
@@ -32,11 +32,15 @@ class Board {
 		int posFlag;
 		int calculatePositionTotal();
 		void loadFromFen(std::string fen);
+		Zobrist zobrist;
+		unsigned long long zobristKey;
+		unsigned long long getZobristKey();
 	private:
-		void move_add_if_legal(Move *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int flags);
+		void moveAdd(Move *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int flags);
 		int wKingSq;
 		int bKingSq;
 		void setPiecePositionTotal();
 		void clearSq(int sq);
 		void setSq(int sq, Piece piece, Color side);
+		unsigned long long rand64();
 };

@@ -54,6 +54,7 @@ int Com::receive() {
 	}
 
 	std::getline(std::cin, command);
+	istringstream is(cmd);
 
 	switch (mode) {
 		case PROTO_XBOARD:  xboard(command);  break;
@@ -88,6 +89,6 @@ int Com::nothing(std::string command) {
 }
 
 void Com::send(std::string command) {
-	std::cout << command << std::endl;
+	std::cout << command << "\n";
 }
 

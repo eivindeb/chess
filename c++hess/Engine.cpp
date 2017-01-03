@@ -3,38 +3,35 @@
 #include <iostream>
 #include <algorithm>
 
-Engine::Engine(int _sideToPlay, int _depth, std::string fen) {
-	sideToPlay = _sideToPlay;
-	depth = _depth;
-
-	if (fen == "") board = Board();
-	else board = Board(fen);
-}
 
 int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
 	if (depthLeft == 0) return quiescence(alpha, beta);
-
-	int score = 0;
 	Move moves[218];
-	int posValBefore = 0;
-	int posValAfter = 0;
-	//int numOfPieces[7] = { 0, 0, 0, 0, 0, 0, 0 };
-	//int numOfPiecesAfter[7] = { 0, 0, 0, 0, 0, 0, 0 };
-	int numOfMoves = board.getLegalMoves(moves);
+	Move ttMove = Move{ (uint8_t) 0, (uint8_t) 0, EMPTY, EMPTY, 0, (uint8_t) 255 };
+	int score = 0;
+	int bestMoveIndex = 0;
+	int ttVal = 0;
+	TT_FLAG ttFlag = TT_ALPHA;
+	if ((ttVal = tTable.probe(board.zobristKey, depthLeft, alpha, beta, &ttMove)) != INVALID) {
+		return ttVal;
+	}
+
+	int numOfMoves = 0;
+	if (board.inCheck(board.sideToMove)) {
+		numOfMoves = board.getLegalMovesInCheck(moves);
+		if (numOfMoves == 0) {
+			return (MATE_SCORE + (maxDepth - depthLeft))*board.sideToMove;
+		}
+	}
+	else {
+		numOfMoves = board.getLegalMoves(moves);
+		if (numOfMoves == 0) {
+			numOfMoves = 0;
+		}
+	}
+	sortMoves(moves, numOfMoves, ttMove.id);
+	
 	for (int i = 0; i < numOfMoves; i++) {
-		posValBefore = board.positionTotal;
-		/*if (i == 0 && depthLeft == 2 && numOfMoves == 28 && alpha == -500 && beta == 200000 && board.halfMoveCount == 8) {
-			numOfPieces[0] = 0;
-		}
-		for (int p = 0; p < 7; p++) {
-			numOfPieces[p] = 0;
-			numOfPiecesAfter[p] = 0;
-		}
-		for (int sq = 0; sq < 120; sq++) {
-			if (ON_BOARD(sq)) {
-				numOfPieces[board.board[sq]]++;
-			}
-		}*/
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) { // move that puts its own king in check
 			board.moveUnmake();
@@ -42,28 +39,18 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
 		}
 		score = -alphaBeta(-beta, -alpha, depthLeft - 1);
 		board.moveUnmake();
-		posValAfter = board.positionTotal;
-		if (posValAfter != posValBefore && depthLeft == 1) {
-			posValAfter = 0;
-		}
-		/*for (int sq = 0; sq < 120; sq++) {
-			if (ON_BOARD(sq)) {
-				numOfPiecesAfter[board.board[sq]]++;
-			}
-		}
-		for (int p = 0; p < 7; p++) {
-			if (numOfPieces[p] != numOfPiecesAfter[p]) {
-				std::cout << "shieeet " << p << std::endl;
-			}
-		}*/
-		if (score >= beta) {
-			return beta;
-		}
 		if (score > alpha) {
+			if (score >= beta) {
+				tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount, beta, TT_BETA, moves[i]);
+				return beta;
+			}
+			bestMoveIndex = i;
+			ttFlag = TT_EXACT;
 			alpha = score;
 		}
 	}
 
+	tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount, alpha, ttFlag, moves[bestMoveIndex]);
 	return alpha;
 }
 
@@ -79,12 +66,14 @@ int Engine::quiescence(int alpha, int beta) {
 	//TODO might have to check for in check here??
 	Move moves[218];
 	int score = 0;
+	unsigned long long zobristBefore = 0;
 	int numOfCaptures = board.getCaptureMoves(moves);
 	mvvLva(moves, numOfCaptures);
 	for (int i = 0; i < numOfCaptures; i++) {
 		if (!(board.posFlag & POS_EG) && !(moves[i].flags & MFLAGS_PROMOTION) && standPat + pieceValues[moves[i].attackedPiece] + 200 < alpha) { // delta pruning
 			continue;
 		}
+		zobristBefore = board.zobristKey;
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) {
 			board.moveUnmake();
@@ -92,6 +81,9 @@ int Engine::quiescence(int alpha, int beta) {
 		}
 		score = -quiescence(-beta, -alpha);
 		board.moveUnmake();
+		if (board.zobristKey != zobristBefore) {
+			zobristBefore = 0;
+		}
 
 		if (score >= beta) {
 			return beta;
@@ -104,11 +96,60 @@ int Engine::quiescence(int alpha, int beta) {
 	return alpha;
 }
 
+// For perft checking
+unsigned long long Engine::perft(int depthLeft) {
+	if (depthLeft == 0) return 1;
+	unsigned long long nodes = 0;
+	unsigned long long nodesLast = 0;
+	unsigned long long zobristBefore = 0;
+	int materialBefore = 0;
+	int posTotBefore = 0;
+
+	Move moves[218];
+	int numOfMoves = 0;
+	if (board.inCheck(board.sideToMove)) {
+		numOfMoves = board.getLegalMovesInCheck(moves);
+		if (numOfMoves == 0) {
+			return 0;
+		}
+	}
+	else {
+		numOfMoves = board.getLegalMoves(moves);
+	}
+
+	if (maxDepth == depthLeft) {
+		std::cout << "Move\tNodes" << std::endl;
+	}
+
+	for (int i = 0; i < numOfMoves; i++) {
+		materialBefore = board.materialTotal;
+		posTotBefore = board.positionTotal;
+		zobristBefore = board.zobristKey;
+		
+		board.moveMake(moves[i]);
+		if (!board.inCheck(Color(board.sideToMove*(-1)))) {
+			nodes += perft(depthLeft - 1);
+			if (maxDepth == depthLeft) {
+				std::cout << SQ_FILE(moves[i].fromSq) << SQ_RANK(moves[i].fromSq) << " " << SQ_FILE(moves[i].toSq) << SQ_RANK(moves[i].toSq) << "\t" << nodes - nodesLast << std::endl;
+				nodesLast = nodes;
+			}
+		}
+		board.moveUnmake();
+		if (materialBefore != board.materialTotal || posTotBefore != board.positionTotal || zobristBefore != board.zobristKey) {
+			materialBefore = 0;
+		}
+	}
+
+	if (maxDepth == depthLeft) {
+		std::cout << "Total nodes: " << nodes << std::endl;
+	}
+
+	return nodes;
+}
+
 inline void Engine::mvvLva(Move *moves, int numOfMoves) {
-	std::sort(moves, moves + numOfMoves, [](Move &lhs, Move &rhs) {int attackerLhs = (lhs.movedPiece == KING) ? 6 : lhs.movedPiece;
-																	int attackerRhs = (rhs.movedPiece == KING) ? 6 : rhs.movedPiece;
-																		return lhs.attackedPiece > rhs.attackedPiece || 
-																		(lhs.attackedPiece == rhs.attackedPiece && attackerLhs < attackerRhs); });
+	std::sort(moves, moves + numOfMoves, [](Move &lhs, Move &rhs) {	return pieceSorting[lhs.attackedPiece] > pieceSorting[rhs.attackedPiece] ||
+																		(pieceSorting[lhs.attackedPiece] == pieceSorting[rhs.attackedPiece] && pieceSorting[lhs.movedPiece] < pieceSorting[rhs.movedPiece]); });
 }
 
 int Engine::evaluatePosition() {
@@ -126,59 +167,110 @@ int Engine::evaluatePosition() {
 		wNumOfMoves = board.getLegalMoves(moves);
 	}
 	board.sideToMove = Color(board.sideToMove*(-1));
+	int score = board.materialTotal + mobilityWeight * (wNumOfMoves - bNumOfMoves) + board.positionTotal;
+	if (board.pieceCount[BISHOP + WHITE * 6 + 6] == 2) {
+		score += pieceValues[BISHOP] * 0.1;
+	}
+	if (board.pieceCount[BISHOP] == 2) {
+		score -= pieceValues[BISHOP] * 0.1;
+	}
 
-	return (board.materialTotal + mobilityWeight * (wNumOfMoves - bNumOfMoves) + board.positionTotal) * board.sideToMove;
+	return (score) * board.sideToMove;
 }
 
-int Engine::findBestMove(Move *moves, int numOfMoves) {
-	int score = -10000 * sideToPlay;
+//TODO, not working for black
+int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int beta) {
+	int score = -200000;
 	int prevScore = score;
+	int bestId = 0;
 	int bestIndex = 0;
+	Move ttMove = Move{ (uint8_t)0, (uint8_t)0, EMPTY, EMPTY, 0, (uint8_t)255 };
+	tTable.probe(board.zobristKey, depth, alpha, beta, &ttMove);
+	sortMoves(moves, numOfMoves, ttMove.id);
 	for (int i = 0; i < numOfMoves; i++) {
+		if (timer.timesUp == true) {
+			return 255;
+		}
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) { // move that puts its own king in check
 			board.moveUnmake();
 			continue;
 		}
-		score = -alphaBeta(-200000, 200000, depth-1)*sideToPlay;
+		score = -alphaBeta(-beta, -alpha, depth-1);
 		board.moveUnmake();
-		std::cout << std::endl << "On move: " << i << "/" << numOfMoves << ":\t" << moves[i].fromSq << " " << moves[i].toSq;
-		std::cout << "\t(" << SQ_FILE(moves[i].fromSq) << SQ_RANK(moves[i].fromSq) << " " << SQ_FILE(moves[i].toSq) << SQ_RANK(moves[i].toSq) << ")\t" << score << std::endl << std::endl;
-		if ((sideToPlay == WHITE && score > prevScore) || (sideToPlay == BLACK && score < prevScore)) {
+		//std::cout << std::endl << "On move: " << i << "/" << numOfMoves << ":\t" << moves[i].fromSq << " " << moves[i].toSq;
+		//std::cout << "\t(" << SQ_FILE(moves[i].fromSq) << SQ_RANK(moves[i].fromSq) << " " << SQ_FILE(moves[i].toSq) << SQ_RANK(moves[i].toSq) << ")\t" << score << std::endl << std::endl;
+		if (score > prevScore) {
 			prevScore = score;
+			bestId = moves[i].id;
 			bestIndex = i;
 		}
 	}
 
-	std::cout << "Highest score: " << prevScore << std::endl;
-	return bestIndex;
+	//std::cout << "Highest score: " << prevScore << std::endl;
+	tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, prevScore, TT_EXACT, moves[bestIndex]);
+	//std::cout << "Best was: " << SQ_FILE(moves[bestIndex].fromSq) << SQ_RANK(moves[bestIndex].fromSq) << SQ_FILE(moves[bestIndex].toSq) << SQ_RANK(moves[bestIndex].toSq) << ": " << prevScore << std::endl;
+	return bestId;
 }
 
-void Engine::playGame() {
-	Move moves[218];
-	int numOfMoves;
-	int moveIndex;
-	board.printBoard();
-	while (1) {
-		if (board.inCheck(board.sideToMove)) {
-			numOfMoves = board.getLegalMovesInCheck(moves);
-			if (numOfMoves == 0) break;
+inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId) {
+	if (bestMoveId != 255 && bestMoveId != 0) {
+		for (int i = 0; i < numOfMoves; i++) {
+			if (moves[i].id == bestMoveId) {
+				std::swap(moves[0], moves[i]);
+				break;
+			}
 		}
-		else {
-			numOfMoves = board.getLegalMoves(moves);
-		}
-		if (board.sideToMove == sideToPlay) {
-			moveIndex = findBestMove(moves, numOfMoves);
-		}
-		else {
-			board.printMoves(moves, numOfMoves);
-			std::cin >> moveIndex;
-		}
-		board.moveMake(moves[moveIndex]);
-		std::cout << "Move played: " << moves[moveIndex].fromSq << " " << moves[moveIndex].toSq << "\t(" << SQ_FILE(moves[moveIndex].fromSq) << SQ_RANK(moves[moveIndex].fromSq) << " " << SQ_FILE(moves[moveIndex].toSq) << SQ_RANK(moves[moveIndex].toSq) << ")\t" <<std::endl;
-		board.printBoard();
+		mvvLva(moves + 1, numOfMoves - 1); // TODO, might not work
 	}
-	std::string side = (board.sideToMove == WHITE) ? "Black" : "White";
-	std::cout << side << " won in " << board.halfMoveCount / 2 << " moves!" << std::endl;
-	std::cin.get();
+	else {
+		mvvLva(moves, numOfMoves);
+	}
+	
+}
+
+int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
+	int bestMoveIndex = 0;
+	int newBest;
+	int pvLength;
+	int alpha = -200000 * board.sideToMove;
+	int beta = 200000 * board.sideToMove;
+	int score;
+	Move pvMove;
+	timer.start(true);
+	std::cout << "PV:" << std::endl;
+	for (int i = 1; i <= maxDepth; i++) {
+		newBest = findBestMove(moves, numOfMoves, i, alpha, beta);
+		pvLength = 0;
+		for (int j = 0; j < i; j++) {
+			score = tTable.probe(board.zobristKey, 0, 0, 0, &pvMove);
+			if (score != INVALID) {
+				score *= board.sideToMove;
+				std::cout << SQ_FILE(pvMove.fromSq) << SQ_RANK(pvMove.fromSq) << SQ_FILE(pvMove.toSq) << SQ_RANK(pvMove.toSq) << " ";
+				board.moveMake(pvMove);
+				pvLength++;
+			}
+			else {
+				std::cout << "PV cut short at iteration: " << i << std::endl;
+				break;
+			}
+			
+		}
+		if (score != INVALID) {
+			for (int j = maxDepth; j > pvLength; j--) {
+				std::cout << "\t";
+			}
+			std::cout << score << std::endl;
+		}
+		for (int j = 0; j < pvLength; j++) {
+			board.moveUnmake();
+		}
+		if (newBest == 255) {
+			std::cout << "TIMES UP" << std::endl;
+			break;
+		}
+		bestMoveIndex = newBest;
+	}
+
+	return bestMoveIndex;
 }

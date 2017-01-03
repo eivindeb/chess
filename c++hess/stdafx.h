@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <tchar.h>
+#include <stdint.h>
 
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
@@ -47,15 +48,23 @@
 #define SQ_FILE(SQ)		(char((SQ % 8) + 97))
 #define SQ_RANK(SQ)		(SQ >> 4) + 1
 
+#define MATE_SCORE		300000
+#define INVALID			2147483647
+#define ENTRY_LIFE		10
 
 
-enum Piece { KING, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY };
-enum Color { WHITE = 1, BLACK = -1, NONE = 0 };
+
+enum Piece : uint8_t { KING, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY };
+enum Color : int8_t { WHITE = 1, BLACK = -1, NONE = 0 };
 
 enum Task { TASK_NOTHING, TASK_SEARCH, TASK_PONDER};
 enum Mode { PROTO_NOTHING, PROTO_XBOARD};
+enum TT_FLAG : uint8_t {
+	TT_EXACT, TT_ALPHA, TT_BETA
+};
 
-static int pieceDeltas[6][8] = {
+
+static int8_t pieceDeltas[6][8] = {
 	{ NW, NORTH, NE, EAST, SE, SOUTH, SW, WEST }, // king
 	{ NW, NORTH, NE, NN, SE, SOUTH, SW, SS },		// pawn
 	{ 31, 33, 18, -14, -31, -33, -18, 14 },		// knight
@@ -108,7 +117,8 @@ static int dirBySquareDiff[239] = {
 	0,0,0,0,SW,0,0,0,0,SE,0,0,0,0,0,SOUTH,0,0,0,0,						//200-219
 	0,SW,0,0,SE,0,0,0,0,0,0,SOUTH,0,0,0,0,0,0,SW };						//220-238
 
-static int pieceValues[6] = { 10000, 100, 300, 300, 500, 900 };
+static int pieceValues[6] = { 10000, 100, 310, 320, 500, 900 };
+static int pieceSorting[7] = { 6, 1, 2, 3, 4, 5, 0 };
 static int mobilityWeight = 10;
 
 static int PSTwPawnMG[120] = {
@@ -376,15 +386,13 @@ static int PSTbKingEG[120] = {
 };
 
 
-
-
-
 struct Move {
-	int fromSq;
-	int toSq;
+	uint8_t fromSq;
+	uint8_t toSq;
 	Piece movedPiece;
 	Piece attackedPiece;
-	int flags;
+	uint16_t flags;
+	uint8_t id;
 };
 
 struct State {
@@ -393,6 +401,23 @@ struct State {
 	int bCastleRights;
 	int enPassant;
 	int halfMoveClk;
+};
+
+struct Zobrist {
+	unsigned long long pieces[6][2][120];
+	unsigned long long side;
+	unsigned long long wCastlingRights[4]; // 0 (NONE), CASTLE_SHORT, CASTLE_LONG, , CASTLE_BOTH
+	unsigned long long bCastlingRights[4];
+	unsigned long long enPassant[8];
+};
+
+struct TranspositionEntry {
+	unsigned long long zobristKey;
+	Move bestMove;
+	int score;
+	uint8_t depth;
+	uint8_t age;
+	TT_FLAG flag;
 };
 
 /* move is on the form:
