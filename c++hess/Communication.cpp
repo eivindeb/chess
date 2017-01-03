@@ -6,22 +6,10 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <windows.h>
 
 Com::Com() {
-	unsigned long dw;
-	hstdin = GetStdHandle(STD_INPUT_HANDLE);
-	pipe = !GetConsoleMode(hstdin, &dw);
-	if (!pipe) {
-		SetConsoleMode(hstdin, dw&~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT));
-		FlushConsoleInputBuffer(hstdin);
-	}
-	else {
-		std::cout.rdbuf()->pubsetbuf(NULL, 0);
-		std::cin.rdbuf()->pubsetbuf(NULL, 0);
-	}
-
-	task = TASK_NOTHING;
-	mode = PROTO_UCI;
+	
 }
 
 int Com::input() {

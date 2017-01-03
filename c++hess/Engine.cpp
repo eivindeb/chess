@@ -1,13 +1,19 @@
 #include "stdafx.h"
+#include <windows.h>
 #include "Engine.h"
 #include "Communication.h"
 #include <iostream>
 #include <algorithm>
+#include <streambuf>
+#include <string>
+#include <sstream>
+#include <vector>
 
-Engine::Engine(int _sideToPlay, int _depth, std::string fen) : tTable(49999991), timer(20), sideToPlay(_sideToPlay), maxDepth(_depth), com() {
+
+Engine::Engine(int _sideToPlay, int _depth, std::string fen) : tTable(49999991), timer(20), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
-	std::thread t1 = std::thread([this] {com.receive(this); });
+	std::thread t1 = std::thread([this] {this->comReceive(); });
 	t1.detach();
 };
 
@@ -280,4 +286,146 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 	}
 
 	return bestMoveIndex;
+}
+
+
+
+void Engine::comInit() {
+	unsigned long dw;
+	hstdin = GetStdHandle(STD_INPUT_HANDLE);
+	pipe = !GetConsoleMode(hstdin, &dw);
+	if (!pipe) {
+		SetConsoleMode(hstdin, dw&~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT));
+		FlushConsoleInputBuffer(hstdin);
+	}
+	else {
+		std::cout.rdbuf()->pubsetbuf(NULL, 0);
+		std::cin.rdbuf()->pubsetbuf(NULL, 0);
+	}
+
+	task = TASK_NOTHING;
+	mode = PROTO_UCI;
+}
+
+int Engine::comReceive() {
+	std::string command;
+
+	if (!comInput()) return 0;
+
+
+	while (1) {
+		std::getline(std::cin, command);
+
+		switch (mode) {
+		//case PROTO_NOTHING: nothing(command); break;
+		case PROTO_UCI:		comUCI(command);	break;
+		}
+	}
+
+	return 1;
+}
+
+int Engine::comInput() {
+	unsigned long dw = 0;
+
+	if (task == TASK_NOTHING) return 1;
+
+	//if (stdin->_cnt > 0) return 1;
+
+	if (pipe) {
+		if (!PeekNamedPipe(hstdin, 0, 0, 0, &dw, 0)) return 1;
+		return dw;
+	}
+	else {
+		GetNumberOfConsoleInputEvents(hstdin, &dw);
+		if (dw > 1) task = TASK_NOTHING;
+	}
+
+	return 0;
+}
+
+int Engine::comUCI(std::string command) {
+	if (command == "uci") {
+		comSend("id name c ++ hess engine");
+		comSend("id author Eivindeb");
+		comSend("uciok");
+	}
+	if (command == "isready") {
+		comSend("readyok");
+	}
+	if (command == "quit") {
+		exit(0);
+	}
+	else {
+		std::string buf; // Have a buffer string
+		std::stringstream ss(command); // Insert the string into a stream
+
+		std::vector<std::string> tokens; // Create vector to hold our words
+
+		while (ss >> buf)
+			tokens.push_back(buf);
+
+		if (tokens[0] == "setposition") {
+			if (tokens[1] == "startpos" && tokens.size() == 2) {
+				return 1;
+			}
+			else {
+				std::string move = tokens.back();
+				std::string moveFrom = move.substr(0, 2);
+				std::string moveTo = move.substr(2);
+				uint16_t flags = 0;
+				if (moveTo.length() == 3) { //promotion
+					flags += MFLAGS_PROMOTION;
+					switch (moveTo.back()) {
+					case 'q':
+						flags += MFLAGS_PROMOTION_QUEEN;
+						break;
+					case 'r':
+						flags += MFLAGS_PROMOTION_ROOK;
+						break;
+					case 'b':
+						flags += MFLAGS_PROMOTION_BISHOP;
+						break;
+					case 'k':
+						flags += MFLAGS_PROMOTION_KNIGHT;
+						break;
+					default:
+						comSend("Unexpected third parameter in moveTo, was:");
+						comSend(moveTo);
+						break;
+					}
+				}
+				uint8_t sqFrom = SQ_STR_TO_INT(moveFrom);
+				uint8_t sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
+
+				if (board.board[sqTo] != EMPTY) flags += MFLAGS_CPT;
+				if (sqTo == board.enPassant) flags += MFLAGS_ENP;
+				if (board.board[sqFrom] == PAWN) {
+					flags += MFLAGS_PAWN_MOVE;
+					if (abs(sqTo - sqFrom) == 32) flags += MFLAGS_PAWN_DOUBLE;
+				}
+
+				if (board.board[sqFrom] == KING && abs(sqFrom - sqTo) == 2) {
+					if (sqFrom > sqTo) {
+						flags += MFLAGS_CASTLE_LONG;
+					}
+					else {
+						flags += MFLAGS_CASTLE_SHORT;
+					}
+				}
+
+				Move moveObject = { sqFrom, sqTo, board.board[sqFrom], board.board[sqTo], flags, NO_ID };
+				board.moveMake(moveObject);
+			}
+		}
+		else if (tokens[0] == "go") {
+			return 2;
+		}
+	}
+
+	return 0;
+}
+
+void Engine::comSend(std::string command) {
+	std::cout << command << std::endl;
 }

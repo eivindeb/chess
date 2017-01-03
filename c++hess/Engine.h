@@ -5,6 +5,7 @@
 #include "Timer.h"
 #include <thread>
 #include <string>
+#include <windows.h>
 
 class Com;
 
@@ -22,7 +23,15 @@ class Engine {
 		unsigned long long perft(int depth);
 		int iterativeDeepening(Move *moves, int numOfMoves);
 		Transposition tTable;
-		Com com;
+		void comInit();
+		int comReceive();
+		int comUCI(std::string command);
+		int comInput();
+		void comSend(std::string command);
+		HANDLE hstdin;
+		int pipe;
+		Task task;
+		Mode mode;
 		Timer timer;
 
 	private:
