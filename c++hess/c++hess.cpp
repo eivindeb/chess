@@ -8,28 +8,43 @@
 #include "Communication.h"
 #include <iostream>
 #include <string>
+#include <sstream>
 
 
 int main()
 {	
-	Com com = Com();
 	Engine myengine = Engine(1, 15);
+	Move moves[218];
+	int numOfMoves;
+	int index;
+	std::stringstream moveStream;
 
-	while (1) {
+	/*while (1) {
 		switch (com.receive()) {
 			case 1:
 				myengine.board.loadFromFen(START_FEN);
 				break;
 			case 2:
-				//Move moves[218];
-				//int numOfMoves = myengine.board.getLegalMoves(moves);
-				//myengine.findBestMove(moves, numOfMoves);
-				//com.
-				com.send("move e2e4");
+				com.send("searching for move");
+				numOfMoves = myengine.board.getLegalMoves(moves);
+				index = myengine.iterativeDeepening(moves, numOfMoves);
+				for (int i = 0; i < numOfMoves; i++) {
+					if (moves[i].id == index) {
+						index = i;
+						break;
+					}
+				}
+				moveStream << "bestmove " << SQ_FILE(moves[index].fromSq) << SQ_RANK(moves[index].fromSq) << SQ_FILE(moves[index].toSq) << SQ_RANK(moves[index].toSq);
+				com.send(moveStream.str());
+				myengine.board.moveMake(moves[index]);
+				moveStream.str("");
+				moveStream.clear();
+				break;
+			default:
 				break;
 		}
-	}
-	Move moves[218];
+	}*/
+	/*Move moves[218];
 	int numOfMoves;
 	int moveIndex;
 	myengine.board.printBoard();
@@ -69,6 +84,6 @@ int main()
 	}
 	std::string side = (myengine.board.sideToMove == WHITE) ? "Black" : "White";
 	std::cout << side << " won in " << myengine.board.halfMoveCount / 2 << " moves!" << std::endl;
-	std::cin.get();
+	std::cin.get();*/
 }
 

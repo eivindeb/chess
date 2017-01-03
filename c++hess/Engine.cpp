@@ -1,13 +1,20 @@
 #include "stdafx.h"
 #include "Engine.h"
+#include "Communication.h"
 #include <iostream>
 #include <algorithm>
 
+Engine::Engine(int _sideToPlay, int _depth, std::string fen) : tTable(49999991), timer(20), sideToPlay(_sideToPlay), maxDepth(_depth), com() {
+	if (fen == "") board = Board();
+	else board = Board(fen);
+	std::thread t1 = std::thread([this] {com.receive(this); });
+	t1.detach();
+};
 
 int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
 	if (depthLeft == 0) return quiescence(alpha, beta);
 	Move moves[218];
-	Move ttMove = Move{ (uint8_t) 0, (uint8_t) 0, EMPTY, EMPTY, 0, (uint8_t) 255 };
+	Move ttMove = Move{ (uint8_t) 0, (uint8_t) 0, EMPTY, EMPTY, 0, (uint8_t) NO_ID };
 	int score = 0;
 	int bestMoveIndex = 0;
 	int ttVal = 0;
@@ -184,12 +191,12 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 	int prevScore = score;
 	int bestId = 0;
 	int bestIndex = 0;
-	Move ttMove = Move{ (uint8_t)0, (uint8_t)0, EMPTY, EMPTY, 0, (uint8_t)255 };
+	Move ttMove = Move{ (uint8_t)0, (uint8_t)0, EMPTY, EMPTY, 0, (uint8_t) NO_ID };
 	tTable.probe(board.zobristKey, depth, alpha, beta, &ttMove);
 	sortMoves(moves, numOfMoves, ttMove.id);
 	for (int i = 0; i < numOfMoves; i++) {
 		if (timer.timesUp == true) {
-			return 255;
+			return NO_ID;
 		}
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) { // move that puts its own king in check
@@ -214,7 +221,7 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 }
 
 inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId) {
-	if (bestMoveId != 255 && bestMoveId != 0) {
+	if (bestMoveId != NO_ID && bestMoveId != 0) {
 		for (int i = 0; i < numOfMoves; i++) {
 			if (moves[i].id == bestMoveId) {
 				std::swap(moves[0], moves[i]);
@@ -265,7 +272,7 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 		for (int j = 0; j < pvLength; j++) {
 			board.moveUnmake();
 		}
-		if (newBest == 255) {
+		if (newBest == NO_ID) {
 			std::cout << "TIMES UP" << std::endl;
 			break;
 		}

@@ -44,13 +44,15 @@
 #define CASTLE_SHORT	1
 #define CASTLE_LONG		2
 
-#define ON_BOARD(SQ)	(SQ & 0x88) == 0
-#define SQ_FILE(SQ)		(char((SQ % 8) + 97))
-#define SQ_RANK(SQ)		(SQ >> 4) + 1
+#define ON_BOARD(SQ)		(SQ & 0x88) == 0
+#define SQ_FILE(SQ)			(char((SQ % 8) + 97))
+#define SQ_RANK(SQ)			(SQ >> 4) + 1
+#define SQ_STR_TO_INT(str)	int(str[0] - 97) + ((str[1] - '0')-1)*16
 
 #define MATE_SCORE		300000
 #define INVALID			2147483647
 #define ENTRY_LIFE		10
+#define NO_ID			255
 
 
 
@@ -58,7 +60,7 @@ enum Piece : uint8_t { KING, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY };
 enum Color : int8_t { WHITE = 1, BLACK = -1, NONE = 0 };
 
 enum Task { TASK_NOTHING, TASK_SEARCH, TASK_PONDER};
-enum Mode { PROTO_NOTHING, PROTO_XBOARD};
+enum Mode { PROTO_NOTHING, PROTO_XBOARD, PROTO_UCI };
 enum TT_FLAG : uint8_t {
 	TT_EXACT, TT_ALPHA, TT_BETA
 };
