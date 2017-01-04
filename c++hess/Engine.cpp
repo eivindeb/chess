@@ -12,6 +12,11 @@
 #define HASH_ORDER		1000000
 #define CPT_ORDER		10000
 #define PROMOTION_ORDER	10000
+#define KILLER_ORDER	10000
+
+#define DRAW_OPENING	-10
+#define DRAW_ENDGAME	0
+#define ENDGAME_MAT		pieceValues[KING] + pieceValues[PAWN] * 4
 
 #define KILLER_PRIMARY		0
 #define KILLER_SECONDARY	1
@@ -24,6 +29,10 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTa
 		comInit();
 		std::thread t1 = std::thread([this] {this->comReceive(); });
 		t1.detach();
+		mode = PROTO_UCI;
+	}
+	else {
+		mode = PROTO_NOTHING;
 	}
 	for (int i = 0; i < 120; i++) {
 		for (int j = 0; j < 120; j++) {
@@ -33,8 +42,8 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTa
 };
 
 int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply) {
-	nodeCnt++;
 	if (depthLeft == 0) return quiescence(alpha, beta);
+
 	Move moves[218];
 	Move ttMove = Move{ (uint8_t) 0, (uint8_t) 0, EMPTY, EMPTY, 0, (uint8_t) NO_ID };
 	int score = 0;
@@ -49,19 +58,19 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply) {
 	if (board.inCheck(board.sideToMove)) {
 		numOfMoves = board.getLegalMovesInCheck(moves);
 		if (numOfMoves == 0) {
-			return (MATE_SCORE - ply)*board.sideToMove;
+			return -(MATE_SCORE - ply);
 		}
+		depthLeft++; // in check extension
 	}
-	else {
-		numOfMoves = board.getLegalMoves(moves);
-		if (numOfMoves == 0) {
-			numOfMoves = 0;
-		}
-	}
-	sortMoves(moves, numOfMoves, ttMove.id);
+	else numOfMoves = board.getLegalMoves(moves);
+
+	sortMoves(moves, numOfMoves, ttMove.id, ply);
+
 	if (timer.timesUp) {
 		return INVALID;
 	}
+
+	if (isRepetition()) return contempt();
 	
 	for (int i = 0; i < numOfMoves; i++) {
 		board.moveMake(moves[i]);
@@ -69,11 +78,12 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply) {
 			board.moveUnmake();
 			continue;
 		}
-		score = -alphaBeta(-beta, -alpha, depthLeft - 1, ply++);
+		score = -alphaBeta(-beta, -alpha, depthLeft - 1, ply + 1);
 		board.moveUnmake();
 		if (score > alpha) {
 			if (score >= beta) {
 				if (!(moves[i].flags & MFLAGS_CPT)  && !(moves[i].flags & MFLAGS_PROMOTION)) {
+					setKillers(moves[i], ply);
 					historyMoves[moves[i].fromSq][moves[i].toSq] += depthLeft*depthLeft;
 				}
 				tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount, beta, TT_BETA, moves[i]);
@@ -259,8 +269,11 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 	int bestId = 0;
 	int bestIndex = 0;
 	Move ttMove = Move{ (uint8_t)0, (uint8_t)0, EMPTY, EMPTY, 0, (uint8_t) NO_ID };
+	if (board.inCheck(board.sideToMove)) { // check extension
+		depth++;
+	}
 	tTable.probe(board.zobristKey, depth, alpha, beta, &ttMove);
-	sortMoves(moves, numOfMoves, ttMove.id);
+	sortMoves(moves, numOfMoves, ttMove.id, 0);
 	for (int i = 0; i < numOfMoves; i++) {
 		if (timer.timesUp == true) {
 			*bestMoveId = NO_ID;
@@ -278,6 +291,10 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 			*bestMoveId = moves[i].id;
 			bestIndex = i;
 			if (score >= beta) {
+				if (!(moves[i].flags & MFLAGS_CPT) && !(moves[i].flags & MFLAGS_PROMOTION)) {
+					setKillers(moves[i], 0);
+					historyMoves[moves[i].fromSq][moves[i].toSq] += depth*depth;
+				}
 				tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, beta, TT_BETA, moves[bestIndex]);
 				return beta;
 			}
@@ -289,14 +306,22 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 	return alpha; //can return alpha to remember windows etc.
 }
 
-inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId) {
+inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId, int ply) {
 	int orderingValues[218] = { 0 };
 	for (int i = 0; i < numOfMoves; i++) {
 		if (moves[i].flags & MFLAGS_CPT) {
 			orderingValues[moves[i].id] += (pieceValues[moves[i].attackedPiece] - pieceValues[moves[i].movedPiece])*CPT_ORDER;
 		}
 		else {
-			orderingValues[moves[i].id] += historyMoves[moves[i].fromSq][moves[i].toSq];
+			if (moves[i].fromSq == killers[ply][KILLER_PRIMARY].fromSq && moves[i].toSq == killers[ply][KILLER_PRIMARY].toSq) {
+				orderingValues[moves[i].id] += KILLER_ORDER;
+			}
+			else if (moves[i].fromSq == killers[ply][KILLER_SECONDARY].fromSq && moves[i].toSq == killers[ply][KILLER_SECONDARY].toSq) {
+				orderingValues[moves[i].id] += KILLER_ORDER - 1000;
+			}
+			else {
+				orderingValues[moves[i].id] += historyMoves[moves[i].fromSq][moves[i].toSq];
+			}	
 		}
 		if (moves[i].flags & MFLAGS_PROMOTION) {
 			if (moves[i].flags & MFLAGS_PROMOTION_QUEEN){
@@ -310,7 +335,7 @@ inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId) {
 			}
 			else orderingValues[moves[i].id] += (pieceValues[KNIGHT] - pieceValues[PAWN]) * PROMOTION_ORDER;
 		}
-		if (bestMoveId != 0 && moves[i].id == bestMoveId) {
+		if (bestMoveId != 0 && bestMoveId != NO_ID && moves[i].id == bestMoveId) {
 			orderingValues[moves[i].id] += HASH_ORDER;
 		}
 	}
@@ -319,51 +344,78 @@ inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId) {
 
 int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 	int val;
+	Color findMoveFor = board.sideToMove;
 	uint8_t newBest = 0;
 	uint8_t bestId = 0;
-	int pvLength;
 	int alpha = -200000;
 	int beta = 200000;
-	int score;
 	Move pvMove;
 	timer.start(true);
-	std::cout << "PV:" << std::endl;
 	decHistoryTable();
 	for (int i = 1; i <= maxDepth; i++) {
-		nodeCnt = 0;
 		val = findBestMove(moves, numOfMoves, i, alpha, beta, &newBest);
 		if (newBest == NO_ID) {
 			std::cout << "TIMES UP" << std::endl;
 			break;
 		}
-		pvLength = 0;
-		for (int j = 0; j < i; j++) {
-			score = tTable.probe(board.zobristKey, 0, 0, 0, &pvMove);
-			if (pvMove.id != NO_ID && score != INVALID) {
-				std::cout << SQ_FILE(pvMove.fromSq) << SQ_RANK(pvMove.fromSq) << SQ_FILE(pvMove.toSq) << SQ_RANK(pvMove.toSq) << " ";
-				board.moveMake(pvMove);
-				pvLength++;
-			}
-			else {
-				std::cout << "PV cut short at iteration: " << i << std::endl;
-				break;
-			}
-			
-		}
-		if (pvMove.id != NO_ID && score != INVALID) {
-			for (int j = maxDepth; j > pvLength; j--) {
-				std::cout << "\t";
-			}
-			std::cout << evaluatePosition()*board.sideToMove << std::endl;
-		}
-		for (int j = 0; j < pvLength; j++) {
-			board.moveUnmake();
-		}
+		infoPV(i);
 		bestId = newBest;
 	}
 
 	return bestId;
 }
+
+void Engine::infoPV(int searchDepth) {
+	int pvLength = 0;
+	TT_FLAG lastMoveFlag;
+	Move pvMove;
+	std::stringstream pvSS;
+	switch (mode) {
+		case PROTO_NOTHING:
+			if (searchDepth == 1) pvSS << "PV\n";
+			break;
+		case PROTO_UCI:
+			pvSS << "info depth " << searchDepth << " pv ";
+			break;
+	}
+	for (int j = 0; j < searchDepth; j++) {
+		if (lastMoveFlag = tTable.getPV(board.zobristKey, &pvMove)) {
+			break;
+		}
+		pvSS << SQ_FILE(pvMove.fromSq) << SQ_RANK(pvMove.fromSq) << SQ_FILE(pvMove.toSq) << SQ_RANK(pvMove.toSq) << " ";
+		board.moveMake(pvMove);
+		pvLength++;
+		if (lastMoveFlag != TT_EXACT) {
+			break;
+		}
+	}
+	switch (mode) {
+		case PROTO_NOTHING:
+			if (lastMoveFlag == TT_BETA) pvSS << ">= ";
+			else if (lastMoveFlag == TT_ALPHA) pvSS << "<= ";
+			pvSS << evaluatePosition()*board.sideToMove;
+			break;
+		case PROTO_UCI:
+			if (lastMoveFlag == TT_EXACT) pvSS << "score cp ";
+			else if (lastMoveFlag == TT_BETA) pvSS << "score lowerbound ";
+			else pvSS << "score upperbound ";
+			pvSS << evaluatePosition()*board.sideToMove;
+			break;
+	}
+
+	for (int j = 0; j < pvLength; j++) {
+		board.moveUnmake();
+	}
+
+	switch (mode) {
+		case PROTO_NOTHING:
+			std::cout << pvSS.str() << std::endl;
+			break;
+		case PROTO_UCI:
+			comSend(pvSS.str());
+	}
+}
+
 
 inline void Engine::decHistoryTable() {
 	for (int i = 0; i < 120; i++) {
@@ -374,10 +426,9 @@ inline void Engine::decHistoryTable() {
 }
 
 inline void Engine::setKillers(Move move, int ply) {
-	if (move.toSq != killers[ply][KILLER_PRIMARY].toSq && move.fromSq != killers[ply][KILLER_PRIMARY].fromSq) {
+	if (move.toSq != killers[ply][KILLER_PRIMARY].toSq || move.fromSq != killers[ply][KILLER_PRIMARY].fromSq) {
 		killers[ply][KILLER_SECONDARY] = killers[ply][KILLER_PRIMARY];
 		killers[ply][KILLER_PRIMARY] = move;
-
 	}
 }
 
@@ -531,6 +582,23 @@ int Engine::comUCI(std::string command) {
 	}
 
 	return 0;
+}
+
+bool Engine::isRepetition() {
+	for (int i = 0; i < board.repIndex; i++) {
+		if (board.repStack[i] == board.zobristKey) {
+			return true;
+		}
+	}
+	return false;
+}
+
+int Engine::contempt() {
+	int score = DRAW_OPENING;
+
+	if (board.getSideMaterialValue(findMoveFor) < ENDGAME_MAT) score = DRAW_ENDGAME;
+
+	return score * findMoveFor;
 }
 
 void Engine::comSend(std::string command) {

@@ -6,6 +6,15 @@ Transposition::Transposition(unsigned long long tableSize) {
 	table = new TranspositionEntry[tableSize];
 }
 
+TT_FLAG Transposition::getPV(unsigned long long zobristKey, Move *pvMove) {
+	TranspositionEntry * entry = &table[zobristKey % size];
+	if (entry->zobristKey == zobristKey && entry->bestMove.id != NO_ID) {
+		*pvMove = entry->bestMove;
+		return entry->flag;
+	}
+	return TT_INVALID;
+}
+
 void Transposition::saveEntry(unsigned long long zobristKey, uint8_t depth, uint8_t age, int score, TT_FLAG flag, Move bestMove) {
 	TranspositionEntry * entry = &table[zobristKey % size];
 

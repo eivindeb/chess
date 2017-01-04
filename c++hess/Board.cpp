@@ -181,6 +181,8 @@ void Board::loadFromFen(std::string fen) {
 	}
 	setPiecePositionTotal();
 	historyIndex = -1;
+	repIndex = 0;
+	repStack[repIndex] = zobristKey;
 }
 
 int Board::getSideMaterialValue(Color side) {
@@ -520,6 +522,7 @@ inline void Board::moveAdd(Move *moves, int moveNum, int squareFrom, int squareT
 
 void Board::moveMake(Move move) { // TODO maybe consider writing captured piece here instead of in each move add if that is more efficient
 	history[++historyIndex] = State{ move, wCastlingRights, bCastlingRights, enPassant, halfMoveClk };
+	repStack[++repIndex] = zobristKey;
 	if (move.movedPiece == KING) {
 		if (boardColor[move.fromSq] == WHITE) {
 			wKingSq = move.toSq;
@@ -719,6 +722,8 @@ void Board::moveUnmake() {
 	if (enPassant != -1) zobristKey ^= zobrist.enPassant[enPassant % 8];
 	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
+
+	--repIndex;
 	//if (zobristKey != getZobristKey()) {
 	//	prevState.move.flags = 0;
 	//}

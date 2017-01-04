@@ -12,10 +12,12 @@ class Com;
 class Engine {
 	public:
 		Engine(int _sideToPlay, int _depth, std::string fen = "", bool console = false);
-		void sortMoves(Move *moves, int numOfMoves, int bestMoveId);
+		void sortMoves(Move *moves, int numOfMoves, int bestMoveId, int ply);
 		int findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int beta, uint8_t *bestMoveId);
 		int miniMax(int depthLeft);
 		int alphaBeta(int alpha, int beta, int depthLeft, int ply);
+		bool isRepetition();
+		int contempt();
 		int quiescence(int alpha, int beta);
 		int evaluatePosition();
 		Board board;
@@ -24,6 +26,7 @@ class Engine {
 		unsigned long long perft(int depth);
 		int iterativeDeepening(Move *moves, int numOfMoves);
 		Transposition tTable;
+		void infoPV(int searchLength);
 		void comInit();
 		int comReceive();
 		int comUCI(std::string command);
@@ -41,5 +44,5 @@ class Engine {
 
 	private:
 		int maxDepth;
-		unsigned long long nodeCnt;
+		Color findMoveFor;
 };

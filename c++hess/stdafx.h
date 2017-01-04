@@ -62,7 +62,7 @@ enum Color : int8_t { WHITE = 1, BLACK = -1, NONE = 0 };
 enum Task { TASK_NOTHING, TASK_SEARCH, TASK_PONDER};
 enum Mode { PROTO_NOTHING, PROTO_XBOARD, PROTO_UCI };
 enum TT_FLAG : uint8_t {
-	TT_EXACT, TT_ALPHA, TT_BETA
+	TT_EXACT, TT_ALPHA, TT_BETA, TT_INVALID = 0
 };
 
 
