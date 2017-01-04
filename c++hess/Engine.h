@@ -31,8 +31,6 @@ class Engine {
 		void comSend(std::string command);
 		int historyMoves[120][120];
 		void decHistoryTable();
-		int everyKiller[50][120][120]; // type of killer, ply, fromSq, toSq
-		void clearEveryKiller();
 		Move killers[50][2];
 		void setKillers(Move move, int ply);
 		HANDLE hstdin;

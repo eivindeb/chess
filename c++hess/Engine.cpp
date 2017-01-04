@@ -329,7 +329,6 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 	timer.start(true);
 	std::cout << "PV:" << std::endl;
 	decHistoryTable();
-	clearEveryKiller();
 	for (int i = 1; i <= maxDepth; i++) {
 		nodeCnt = 0;
 		val = findBestMove(moves, numOfMoves, i, alpha, beta, &newBest);
@@ -374,25 +373,11 @@ inline void Engine::decHistoryTable() {
 	}
 }
 
-inline void Engine::clearEveryKiller() {
-	for (int i = 0; i < 50; i++) {
-		for (int j = 0; j < 120; j++) {
-			for (int k = 0; k < 120; k++) {
-				everyKiller[i][j][k] = 0;
-			}
-		}
-	}
-}
-
 inline void Engine::setKillers(Move move, int ply) {
-	everyKiller[ply][move.fromSq][move.toSq]++;
-	if (everyKiller[ply][move.fromSq][move.toSq] > everyKiller[ply][killers[ply][KILLER_PRIMARY].fromSq][killers[ply][KILLER_PRIMARY].toSq] && move.toSq != killers[ply][KILLER_PRIMARY].toSq && move.fromSq != killers[ply][KILLER_PRIMARY].fromSq) {
+	if (move.toSq != killers[ply][KILLER_PRIMARY].toSq && move.fromSq != killers[ply][KILLER_PRIMARY].fromSq) {
 		killers[ply][KILLER_SECONDARY] = killers[ply][KILLER_PRIMARY];
 		killers[ply][KILLER_PRIMARY] = move;
 
-	}
-	else if (everyKiller[ply][move.fromSq][move.toSq] > everyKiller[ply][killers[ply][KILLER_SECONDARY].fromSq][killers[ply][KILLER_SECONDARY].toSq]) {
-		killers[ply][KILLER_SECONDARY] = move;
 	}
 }
 
