@@ -9,15 +9,31 @@
 #include <sstream>
 #include <vector>
 
+#define HASH_ORDER		1000000
+#define CPT_ORDER		10000
+#define PROMOTION_ORDER	10000
 
-Engine::Engine(int _sideToPlay, int _depth, std::string fen) : tTable(49999991), timer(20), sideToPlay(_sideToPlay), maxDepth(_depth) {
+#define KILLER_PRIMARY		0
+#define KILLER_SECONDARY	1
+
+
+Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(49999991), timer(20), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
-	std::thread t1 = std::thread([this] {this->comReceive(); });
-	t1.detach();
+	if (!console) {
+		comInit();
+		std::thread t1 = std::thread([this] {this->comReceive(); });
+		t1.detach();
+	}
+	for (int i = 0; i < 120; i++) {
+		for (int j = 0; j < 120; j++) {
+			historyMoves[i][j] = 0;
+		}
+	}
 };
 
-int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
+int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply) {
+	nodeCnt++;
 	if (depthLeft == 0) return quiescence(alpha, beta);
 	Move moves[218];
 	Move ttMove = Move{ (uint8_t) 0, (uint8_t) 0, EMPTY, EMPTY, 0, (uint8_t) NO_ID };
@@ -33,7 +49,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
 	if (board.inCheck(board.sideToMove)) {
 		numOfMoves = board.getLegalMovesInCheck(moves);
 		if (numOfMoves == 0) {
-			return (MATE_SCORE + (maxDepth - depthLeft))*board.sideToMove;
+			return (MATE_SCORE - ply)*board.sideToMove;
 		}
 	}
 	else {
@@ -43,6 +59,9 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
 		}
 	}
 	sortMoves(moves, numOfMoves, ttMove.id);
+	if (timer.timesUp) {
+		return INVALID;
+	}
 	
 	for (int i = 0; i < numOfMoves; i++) {
 		board.moveMake(moves[i]);
@@ -50,10 +69,13 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft) {
 			board.moveUnmake();
 			continue;
 		}
-		score = -alphaBeta(-beta, -alpha, depthLeft - 1);
+		score = -alphaBeta(-beta, -alpha, depthLeft - 1, ply++);
 		board.moveUnmake();
 		if (score > alpha) {
 			if (score >= beta) {
+				if (!(moves[i].flags & MFLAGS_CPT)  && !(moves[i].flags & MFLAGS_PROMOTION)) {
+					historyMoves[moves[i].fromSq][moves[i].toSq] += depthLeft*depthLeft;
+				}
 				tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount, beta, TT_BETA, moves[i]);
 				return beta;
 			}
@@ -160,6 +182,46 @@ unsigned long long Engine::perft(int depthLeft) {
 	return nodes;
 }
 
+int Engine::miniMax(int depthLeft) {
+	if (depthLeft == 0) return evaluatePosition();
+	int score;
+	int scoreMax = -20000;
+
+	Move moves[218];
+	int numOfMoves = 0;
+	if (board.inCheck(board.sideToMove)) {
+		numOfMoves = board.getLegalMovesInCheck(moves);
+		if (numOfMoves == 0) {
+			return 0;
+		}
+	}
+	else {
+		numOfMoves = board.getLegalMoves(moves);
+	}
+
+	if (maxDepth == depthLeft) {
+		std::cout << "Move\tScore" << std::endl;
+	}
+
+	for (int i = 0; i < numOfMoves; i++) {
+
+		board.moveMake(moves[i]);
+		if (!board.inCheck(Color(board.sideToMove*(-1)))) {
+			score = -miniMax(depthLeft - 1);
+			for (int j = depthLeft; j < 3; j++) {
+				std::cout << "\t";
+			}
+			std::cout << SQ_FILE(moves[i].fromSq) << SQ_RANK(moves[i].fromSq) << " " << SQ_FILE(moves[i].toSq) << SQ_RANK(moves[i].toSq) << "\t" << score << std::endl;
+		}
+		if (score > scoreMax) {
+			scoreMax = score;
+		}
+		board.moveUnmake();
+	}
+
+	return scoreMax;
+}
+
 inline void Engine::mvvLva(Move *moves, int numOfMoves) {
 	std::sort(moves, moves + numOfMoves, [](Move &lhs, Move &rhs) {	return pieceSorting[lhs.attackedPiece] > pieceSorting[rhs.attackedPiece] ||
 																		(pieceSorting[lhs.attackedPiece] == pieceSorting[rhs.attackedPiece] && pieceSorting[lhs.movedPiece] < pieceSorting[rhs.movedPiece]); });
@@ -192,9 +254,8 @@ int Engine::evaluatePosition() {
 }
 
 //TODO, not working for black
-int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int beta) {
-	int score = -200000;
-	int prevScore = score;
+int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int beta, uint8_t *bestMoveId) {
+	int score = -20000;
 	int bestId = 0;
 	int bestIndex = 0;
 	Move ttMove = Move{ (uint8_t)0, (uint8_t)0, EMPTY, EMPTY, 0, (uint8_t) NO_ID };
@@ -202,63 +263,84 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 	sortMoves(moves, numOfMoves, ttMove.id);
 	for (int i = 0; i < numOfMoves; i++) {
 		if (timer.timesUp == true) {
-			return NO_ID;
+			*bestMoveId = NO_ID;
+			return 0;
 		}
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) { // move that puts its own king in check
 			board.moveUnmake();
 			continue;
 		}
-		score = -alphaBeta(-beta, -alpha, depth-1);
+		score = -alphaBeta(-beta, -alpha, depth-1, 1);
 		board.moveUnmake();
-		//std::cout << std::endl << "On move: " << i << "/" << numOfMoves << ":\t" << moves[i].fromSq << " " << moves[i].toSq;
-		//std::cout << "\t(" << SQ_FILE(moves[i].fromSq) << SQ_RANK(moves[i].fromSq) << " " << SQ_FILE(moves[i].toSq) << SQ_RANK(moves[i].toSq) << ")\t" << score << std::endl << std::endl;
-		if (score > prevScore) {
-			prevScore = score;
-			bestId = moves[i].id;
+		if (score > alpha) {
+			alpha = score;
+			*bestMoveId = moves[i].id;
 			bestIndex = i;
+			if (score >= beta) {
+				tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, beta, TT_BETA, moves[bestIndex]);
+				return beta;
+			}
+			tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, alpha, TT_ALPHA, moves[bestIndex]);
 		}
 	}
 
-	//std::cout << "Highest score: " << prevScore << std::endl;
-	tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, prevScore, TT_EXACT, moves[bestIndex]);
-	//std::cout << "Best was: " << SQ_FILE(moves[bestIndex].fromSq) << SQ_RANK(moves[bestIndex].fromSq) << SQ_FILE(moves[bestIndex].toSq) << SQ_RANK(moves[bestIndex].toSq) << ": " << prevScore << std::endl;
-	return bestId;
+	tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, alpha, TT_EXACT, moves[bestIndex]);
+	return alpha; //can return alpha to remember windows etc.
 }
 
 inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId) {
-	if (bestMoveId != NO_ID && bestMoveId != 0) {
-		for (int i = 0; i < numOfMoves; i++) {
-			if (moves[i].id == bestMoveId) {
-				std::swap(moves[0], moves[i]);
-				break;
-			}
+	int orderingValues[218] = { 0 };
+	for (int i = 0; i < numOfMoves; i++) {
+		if (moves[i].flags & MFLAGS_CPT) {
+			orderingValues[moves[i].id] += (pieceValues[moves[i].attackedPiece] - pieceValues[moves[i].movedPiece])*CPT_ORDER;
 		}
-		mvvLva(moves + 1, numOfMoves - 1); // TODO, might not work
+		else {
+			orderingValues[moves[i].id] += historyMoves[moves[i].fromSq][moves[i].toSq];
+		}
+		if (moves[i].flags & MFLAGS_PROMOTION) {
+			if (moves[i].flags & MFLAGS_PROMOTION_QUEEN){
+				orderingValues[moves[i].id] += (pieceValues[QUEEN] - pieceValues[PAWN]) * PROMOTION_ORDER;
+			}
+			else if (moves[i].flags & MFLAGS_PROMOTION_ROOK) {
+				orderingValues[moves[i].id] += (pieceValues[ROOK] - pieceValues[PAWN]) * PROMOTION_ORDER;
+			}
+			else if (moves[i].flags & MFLAGS_PROMOTION_BISHOP) {
+				orderingValues[moves[i].id] += (pieceValues[BISHOP] - pieceValues[PAWN]) * PROMOTION_ORDER;
+			}
+			else orderingValues[moves[i].id] += (pieceValues[KNIGHT] - pieceValues[PAWN]) * PROMOTION_ORDER;
+		}
+		if (bestMoveId != 0 && moves[i].id == bestMoveId) {
+			orderingValues[moves[i].id] += HASH_ORDER;
+		}
 	}
-	else {
-		mvvLva(moves, numOfMoves);
-	}
-	
+	std::sort(moves, moves + numOfMoves, [&orderingValues](Move lhs, Move rhs) {return orderingValues[lhs.id] > orderingValues[rhs.id]; });
 }
 
 int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
-	int bestMoveIndex = 0;
-	int newBest;
+	int val;
+	uint8_t newBest = 0;
+	uint8_t bestId = 0;
 	int pvLength;
-	int alpha = -200000 * board.sideToMove;
-	int beta = 200000 * board.sideToMove;
+	int alpha = -200000;
+	int beta = 200000;
 	int score;
 	Move pvMove;
 	timer.start(true);
 	std::cout << "PV:" << std::endl;
+	decHistoryTable();
+	clearEveryKiller();
 	for (int i = 1; i <= maxDepth; i++) {
-		newBest = findBestMove(moves, numOfMoves, i, alpha, beta);
+		nodeCnt = 0;
+		val = findBestMove(moves, numOfMoves, i, alpha, beta, &newBest);
+		if (newBest == NO_ID) {
+			std::cout << "TIMES UP" << std::endl;
+			break;
+		}
 		pvLength = 0;
 		for (int j = 0; j < i; j++) {
 			score = tTable.probe(board.zobristKey, 0, 0, 0, &pvMove);
-			if (score != INVALID) {
-				score *= board.sideToMove;
+			if (pvMove.id != NO_ID && score != INVALID) {
 				std::cout << SQ_FILE(pvMove.fromSq) << SQ_RANK(pvMove.fromSq) << SQ_FILE(pvMove.toSq) << SQ_RANK(pvMove.toSq) << " ";
 				board.moveMake(pvMove);
 				pvLength++;
@@ -269,23 +351,49 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 			}
 			
 		}
-		if (score != INVALID) {
+		if (pvMove.id != NO_ID && score != INVALID) {
 			for (int j = maxDepth; j > pvLength; j--) {
 				std::cout << "\t";
 			}
-			std::cout << score << std::endl;
+			std::cout << evaluatePosition()*board.sideToMove << std::endl;
 		}
 		for (int j = 0; j < pvLength; j++) {
 			board.moveUnmake();
 		}
-		if (newBest == NO_ID) {
-			std::cout << "TIMES UP" << std::endl;
-			break;
-		}
-		bestMoveIndex = newBest;
+		bestId = newBest;
 	}
 
-	return bestMoveIndex;
+	return bestId;
+}
+
+inline void Engine::decHistoryTable() {
+	for (int i = 0; i < 120; i++) {
+		for (int j = 0; j < 120; j++) {
+			historyMoves[i][j] = historyMoves[i][j] / 8;
+		}
+	}
+}
+
+inline void Engine::clearEveryKiller() {
+	for (int i = 0; i < 50; i++) {
+		for (int j = 0; j < 120; j++) {
+			for (int k = 0; k < 120; k++) {
+				everyKiller[i][j][k] = 0;
+			}
+		}
+	}
+}
+
+inline void Engine::setKillers(Move move, int ply) {
+	everyKiller[ply][move.fromSq][move.toSq]++;
+	if (everyKiller[ply][move.fromSq][move.toSq] > everyKiller[ply][killers[ply][KILLER_PRIMARY].fromSq][killers[ply][KILLER_PRIMARY].toSq] && move.toSq != killers[ply][KILLER_PRIMARY].toSq && move.fromSq != killers[ply][KILLER_PRIMARY].fromSq) {
+		killers[ply][KILLER_SECONDARY] = killers[ply][KILLER_PRIMARY];
+		killers[ply][KILLER_PRIMARY] = move;
+
+	}
+	else if (everyKiller[ply][move.fromSq][move.toSq] > everyKiller[ply][killers[ply][KILLER_SECONDARY].fromSq][killers[ply][KILLER_SECONDARY].toSq]) {
+		killers[ply][KILLER_SECONDARY] = move;
+	}
 }
 
 
@@ -318,7 +426,7 @@ int Engine::comReceive() {
 
 		switch (mode) {
 		//case PROTO_NOTHING: nothing(command); break;
-		case PROTO_UCI:		comUCI(command);	break;
+			case PROTO_UCI:		comUCI(command);	break;
 		}
 	}
 
@@ -350,10 +458,10 @@ int Engine::comUCI(std::string command) {
 		comSend("id author Eivindeb");
 		comSend("uciok");
 	}
-	if (command == "isready") {
+	else if (command == "isready") {
 		comSend("readyok");
 	}
-	if (command == "quit") {
+	else if (command == "quit") {
 		exit(0);
 	}
 	else {
@@ -365,9 +473,9 @@ int Engine::comUCI(std::string command) {
 		while (ss >> buf)
 			tokens.push_back(buf);
 
-		if (tokens[0] == "setposition") {
+		if (tokens[0] == "position") {
 			if (tokens[1] == "startpos" && tokens.size() == 2) {
-				return 1;
+				board.loadFromFen(START_FEN);
 			}
 			else {
 				std::string move = tokens.back();
@@ -419,7 +527,21 @@ int Engine::comUCI(std::string command) {
 			}
 		}
 		else if (tokens[0] == "go") {
-			return 2;
+			Move moves[218];
+			int numOfMoves;
+			int index;
+			std::stringstream moveStream;
+			numOfMoves = board.getLegalMoves(moves);
+			index = iterativeDeepening(moves, numOfMoves);
+			for (int i = 0; i < numOfMoves; i++) {
+				if (moves[i].id == index) {
+					index = i;
+					break;
+				}
+			}
+			moveStream << "bestmove " << SQ_FILE(moves[index].fromSq) << SQ_RANK(moves[index].fromSq) << SQ_FILE(moves[index].toSq) << SQ_RANK(moves[index].toSq);
+			comSend(moveStream.str());
+			board.moveMake(moves[index]);
 		}
 	}
 

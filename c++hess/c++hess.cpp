@@ -13,11 +13,15 @@
 
 int main()
 {	
-	Engine myengine = Engine(1, 15);
-	Move moves[218];
+	Engine myengine = Engine(2, 15, "", true);
+	/*Move moves[218];
 	int numOfMoves;
 	int index;
-	std::stringstream moveStream;
+	std::stringstream moveStream;*/
+
+	//while (1) {
+		//do nothing
+	//}
 
 	/*while (1) {
 		switch (com.receive()) {
@@ -44,10 +48,11 @@ int main()
 				break;
 		}
 	}*/
-	/*Move moves[218];
+	Move moves[218];
 	int numOfMoves;
 	int moveIndex;
 	myengine.board.printBoard();
+	//std::cout << "Best was: " << myengine.miniMax(3);
 	//myengine.perft(6);
 
 	while (1) {
@@ -84,6 +89,6 @@ int main()
 	}
 	std::string side = (myengine.board.sideToMove == WHITE) ? "Black" : "White";
 	std::cout << side << " won in " << myengine.board.halfMoveCount / 2 << " moves!" << std::endl;
-	std::cin.get();*/
+	std::cin.get();
 }
 
