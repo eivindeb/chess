@@ -35,7 +35,7 @@ class Board {
 		Zobrist zobrist;
 		unsigned long long zobristKey;
 		unsigned long long getZobristKey();
-		unsigned long long repStack[50];
+		unsigned long long repStack[1024];
 		int	repIndex;
 	private:
 		void moveAdd(Move *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int flags);

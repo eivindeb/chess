@@ -21,8 +21,10 @@
 #define KILLER_PRIMARY		0
 #define KILLER_SECONDARY	1
 
+#define WINDOW_SIZE pieceValues[PAWN] / 2
 
-Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(49999991), timer(20), sideToPlay(_sideToPlay), maxDepth(_depth) {
+
+Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(49999991), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
 	if (!console) {
@@ -39,9 +41,12 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTa
 			historyMoves[i][j] = 0;
 		}
 	}
+	wmsLeft = 0;
+	bmsLeft = 0;
 };
 
 int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply) {
+	nodeCount++;
 	if (depthLeft == 0) return quiescence(alpha, beta);
 
 	Move moves[218];
@@ -100,6 +105,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply) {
 }
 
 int Engine::quiescence(int alpha, int beta) {
+	nodeCount++;
 	int standPat = evaluatePosition();
 	if (standPat >= beta) {
 		return beta;
@@ -268,6 +274,7 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 	int score = -20000;
 	int bestId = 0;
 	int bestIndex = 0;
+	nodeCount++;
 	Move ttMove = Move{ (uint8_t)0, (uint8_t)0, EMPTY, EMPTY, 0, (uint8_t) NO_ID };
 	if (board.inCheck(board.sideToMove)) { // check extension
 		depth++;
@@ -275,7 +282,7 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 	tTable.probe(board.zobristKey, depth, alpha, beta, &ttMove);
 	sortMoves(moves, numOfMoves, ttMove.id, 0);
 	for (int i = 0; i < numOfMoves; i++) {
-		if (timer.timesUp == true) {
+		if (timer.timesUp == true || stopSearch) {
 			*bestMoveId = NO_ID;
 			return 0;
 		}
@@ -303,7 +310,7 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 	}
 
 	tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, alpha, TT_EXACT, moves[bestIndex]);
-	return alpha; //can return alpha to remember windows etc.
+	return alpha;
 }
 
 inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId, int ply) {
@@ -343,26 +350,85 @@ inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId, int p
 }
 
 int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
-	int val;
+	int score;
 	Color findMoveFor = board.sideToMove;
 	uint8_t newBest = 0;
 	uint8_t bestId = 0;
 	int alpha = -200000;
 	int beta = 200000;
 	Move pvMove;
-	timer.start(true);
+	stopSearch = false;
+	nodeCount = 0;
+	timer.start(true, calculateTimeForMove(findMoveFor));
+	unsigned long searchStart;
+	unsigned long long lastNodeCount = 0;
 	decHistoryTable();
 	for (int i = 1; i <= maxDepth; i++) {
-		val = findBestMove(moves, numOfMoves, i, alpha, beta, &newBest);
+		searchStart = timer.mseconds;
+		score = findBestMove(moves, numOfMoves, i, alpha, beta, &newBest);
+		if (score <= alpha) {
+			alpha -= 2 * WINDOW_SIZE;
+			i--;
+			continue;
+		}
+		else if (score >= beta) {
+			beta += 2 * WINDOW_SIZE;
+			i--;
+			continue;
+		}
+		alpha = score - WINDOW_SIZE;
+		beta = score + WINDOW_SIZE;
 		if (newBest == NO_ID) {
 			std::cout << "TIMES UP" << std::endl;
 			break;
 		}
 		infoPV(i);
+		infoNPS(i, nodeCount - lastNodeCount, searchStart);
 		bestId = newBest;
+		lastNodeCount = nodeCount;
 	}
+	infoNPS(5, nodeCount, 0);
 
 	return bestId;
+}
+
+inline unsigned long Engine::calculateTimeForMove(Color side) {
+	if (mode == PROTO_UCI) {
+			int timeLeft = (side == WHITE) ? wmsLeft : bmsLeft;
+			int timeInc = (side == WHITE) ? wTimeInc : bTimeInc;
+			float fractionAllowed = 0.1;
+			if (board.halfMoveCount < 20) {
+				fractionAllowed = 0.05;
+			} // TODO, something with 0 increment
+			std::stringstream ss;
+			ss << "Gonna use " << timeLeft * fractionAllowed + timeInc << " mseconds";
+			comSend(ss.str());
+			return timeLeft * fractionAllowed + timeInc;
+			
+	}
+	else if (mode == PROTO_NOTHING) {
+		return 15 * 1000;
+	}
+	
+}
+
+inline void Engine::infoNPS(int searchDepth, unsigned long long nodes, unsigned long startTime) {
+	unsigned long elapsedTime = timer.mseconds - startTime;
+	if (elapsedTime) {
+		switch (mode) {
+			case PROTO_NOTHING:
+				std::cout << " NPS: " << (nodes / double((timer.mseconds - startTime))) * 1000 << std::endl;
+				break;
+			case PROTO_UCI:
+				std::stringstream ss;
+				ss << "info nps " << (nodes / double((timer.mseconds - startTime))) * 1000;
+				comSend(ss.str());
+				break;
+		}
+	}
+	else if (mode == PROTO_NOTHING) {
+		std::cout << std::endl;
+	}
 }
 
 void Engine::infoPV(int searchDepth) {
@@ -409,7 +475,7 @@ void Engine::infoPV(int searchDepth) {
 
 	switch (mode) {
 		case PROTO_NOTHING:
-			std::cout << pvSS.str() << std::endl;
+			std::cout << pvSS.str();
 			break;
 		case PROTO_UCI:
 			comSend(pvSS.str());
@@ -500,6 +566,13 @@ int Engine::comUCI(std::string command) {
 	else if (command == "quit") {
 		exit(0);
 	}
+	else if (command == "stop") {
+		stopSearch = true;
+	}
+	else if (command == "ucinewgame") {
+		board = Board();
+		
+	}
 	else {
 		std::string buf; // Have a buffer string
 		std::stringstream ss(command); // Insert the string into a stream
@@ -563,6 +636,26 @@ int Engine::comUCI(std::string command) {
 			}
 		}
 		else if (tokens[0] == "go") {
+			if (tokens.size() > 1) {
+				for (int i = 0; i < tokens.size(); i++) {
+					if (tokens[i] == "wtime") {
+						wmsLeft = std::stoi(tokens[i + 1]);
+						i++;
+					}
+					else if (tokens[i] == "btime") {
+						bmsLeft = std::stoi(tokens[i + 1]);
+						i++;
+					}
+					else if (tokens[i] == "winc") {
+						wTimeInc = std::stoi(tokens[i + 1]);
+						i++;
+					}
+					else if (tokens[i] == "binc") {
+						bTimeInc = std::stoi(tokens[i + 1]);
+						i++;
+					}
+				}
+			}
 			Move moves[218];
 			int numOfMoves;
 			int index;

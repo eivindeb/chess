@@ -3,15 +3,16 @@
 #include <chrono>
 #include <thread>
 
-Timer::Timer(int max) {
-	secondsMax = max;
+Timer::Timer() {
+	msecondsMax = 10*1000;
 }
 
-void Timer::start(bool fromStart) {
+void Timer::start(bool fromStart, unsigned long duration) {
 	timesUp = false;
 	if (fromStart == true) {
 		mseconds = 0;
 	}
+	msecondsMax = duration;
 
 	std::thread t1 = std::thread([this] {this->incTimer(); });
 	threadId = t1.get_id();
@@ -19,9 +20,9 @@ void Timer::start(bool fromStart) {
 }
 
 void Timer::incTimer() {
-	while (mseconds < secondsMax * 1000) {
+	while (mseconds < msecondsMax) {
 		auto start = std::chrono::high_resolution_clock::now();
-		std::this_thread::sleep_for(std::chrono::seconds(1));
+		std::this_thread::sleep_for(std::chrono::milliseconds(20));
 		auto end = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double, std::milli> elapsed = end - start;
 		mseconds += elapsed.count();

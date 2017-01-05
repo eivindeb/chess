@@ -36,13 +36,20 @@ class Engine {
 		void decHistoryTable();
 		Move killers[50][2];
 		void setKillers(Move move, int ply);
+		void infoNPS(int searchDepth, unsigned long long nodes, unsigned long startTime);
 		HANDLE hstdin;
 		int pipe;
 		Task task;
 		Mode mode;
 		Timer timer;
-
 	private:
+		unsigned long calculateTimeForMove(Color side);
+		int wmsLeft;
+		int wTimeInc;
+		int bmsLeft;
+		int bTimeInc;
+		bool stopSearch;
 		int maxDepth;
+		unsigned long long nodeCount;
 		Color findMoveFor;
 };

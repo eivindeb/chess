@@ -13,15 +13,15 @@
 
 int main()
 {	
-	Engine myengine = Engine(1, 15, "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", true);
+	Engine myengine = Engine(1, 15, "", false);
 	/*Move moves[218];
 	int numOfMoves;
 	int index;
 	std::stringstream moveStream;*/
 
-	//while (1) {
+	while (1) {
 		//do nothing
-	//}
+	}
 
 	/*while (1) {
 		switch (com.receive()) {

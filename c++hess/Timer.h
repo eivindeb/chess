@@ -4,12 +4,13 @@
 
 class Timer {
 	public:
-		Timer(int max);
-		void start(bool fromStart);
+		Timer();
+		void start(bool fromStart, unsigned long duration);
 		void incTimer();
 		unsigned long mseconds;
-		int secondsMax;
+		
 		bool timesUp;
 	private:
 		std::thread::id threadId;
+		unsigned long msecondsMax;
 };
