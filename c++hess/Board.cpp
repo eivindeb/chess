@@ -520,6 +520,31 @@ inline void Board::moveAdd(Move *moves, int moveNum, int squareFrom, int squareT
 	moves[moveNum] = Move{ static_cast<uint8_t>(squareFrom), static_cast<uint8_t>(squareTo), movedPiece, attacked, static_cast<uint16_t>(flags), static_cast<uint8_t>(moveNum) };
 }
 
+void Board::moveMakeNull() {
+	sideToMove = Color(sideToMove*(-1));
+	zobristKey ^= zobrist.side;
+	halfMoveCount++;
+	history[++historyIndex] = State{ Move {128, 128, EMPTY, EMPTY, MFLAGS_NULL, NO_ID }, wCastlingRights, bCastlingRights, enPassant, halfMoveClk };
+	if (enPassant != -1) {
+		zobristKey ^= zobrist.enPassant[enPassant % 8];
+		enPassant = -1;
+	}
+}
+
+void Board::moveUnmakeNull() {
+	State prevState = history[historyIndex--];
+	sideToMove = Color(sideToMove * (-1));
+	zobristKey ^= zobrist.side;
+	halfMoveCount--;
+	if (enPassant != -1) {
+		zobristKey ^= zobrist.enPassant[enPassant % 8];
+	}
+	enPassant = prevState.enPassant;
+	if (enPassant != -1) {
+		zobristKey ^= zobrist.enPassant[enPassant % 8];
+	}
+}
+
 void Board::moveMake(Move move) { // TODO maybe consider writing captured piece here instead of in each move add if that is more efficient
 	history[++historyIndex] = State{ move, wCastlingRights, bCastlingRights, enPassant, halfMoveClk };
 	repStack[++repIndex] = zobristKey;

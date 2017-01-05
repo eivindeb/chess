@@ -21,6 +21,8 @@ class Board {
 		void printBoard();
 		std::string getFenString();
 		void moveMake(Move move);
+		void moveMakeNull();
+		void moveUnmakeNull();
 		void moveUnmake();
 		int materialTotal;
 		int positionTotal;

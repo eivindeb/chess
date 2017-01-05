@@ -47,7 +47,7 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTa
 	bmsLeft = 0;
 };
 
-int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply) {
+int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNull, bool isPV) {
 	nodeCount++;
 	if (depthLeft == 0) return quiescence(alpha, beta);
 
@@ -56,13 +56,23 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply) {
 	int score = 0;
 	int bestMoveIndex = 0;
 	int ttVal = 0;
+	bool inCheck = board.inCheck(board.sideToMove);
+	bool raisedAlpha = false;
+
 	TT_FLAG ttFlag = TT_ALPHA;
 	if ((ttVal = tTable.probe(board.zobristKey, depthLeft, alpha, beta, &ttMove)) != INVALID) {
 		return ttVal;
 	}
 
+	if (depthLeft > 2 && allowNull && !(board.phaseFlag & PHASE_EG) && !isPV && !inCheck) { // null move pruning
+		board.moveMakeNull();
+		score = -alphaBeta(-beta, -beta + 1, depthLeft - 1 - R, ply, !ALLOW_NULL, NOT_PV);
+		board.moveUnmakeNull();
+		if (score >= beta) return beta;
+	}
+
 	int numOfMoves = 0;
-	if (board.inCheck(board.sideToMove)) {
+	if (inCheck) {
 		numOfMoves = board.getLegalMovesInCheck(moves);
 		if (numOfMoves == 0) {
 			return -(MATE_SCORE - ply);
@@ -661,7 +671,7 @@ int Engine::comUCI(std::string command) {
 		}
 		else if (tokens[0] == "go") {
 			if (tokens.size() > 1) {
-				for (int i = 0; i < tokens.size(); i++) {
+				for (int i = 1; i < tokens.size(); i++) {
 					if (tokens[i] == "wtime") {
 						wmsLeft = std::stoi(tokens[i + 1]);
 						i++;

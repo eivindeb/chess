@@ -15,7 +15,7 @@ class Engine {
 		void sortMoves(Move *moves, int numOfMoves, int bestMoveId, int ply);
 		int findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int beta, uint8_t *bestMoveId);
 		int miniMax(int depthLeft);
-		int alphaBeta(int alpha, int beta, int depthLeft, int ply);
+		int alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNull, bool isPV);
 		bool isRepetition();
 		int contempt();
 		int quiescence(int alpha, int beta);
