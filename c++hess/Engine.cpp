@@ -21,6 +21,8 @@
 #define KILLER_PRIMARY		0
 #define KILLER_SECONDARY	1
 
+#define DEPTH_TIME_INCREASE 5
+
 #define WINDOW_SIZE pieceValues[PAWN] / 2
 
 
@@ -71,8 +73,8 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply) {
 
 	sortMoves(moves, numOfMoves, ttMove.id, ply);
 
-	if (timer.timesUp) {
-		return INVALID;
+	if (!(nodeCount & 4000) && timer.timesUp) {
+		return 0;
 	}
 
 	if (isRepetition()) return contempt();
@@ -121,7 +123,7 @@ int Engine::quiescence(int alpha, int beta) {
 	int numOfCaptures = board.getCaptureMoves(moves);
 	mvvLva(moves, numOfCaptures);
 	for (int i = 0; i < numOfCaptures; i++) {
-		if (!(board.posFlag & POS_EG) && !(moves[i].flags & MFLAGS_PROMOTION) && standPat + pieceValues[moves[i].attackedPiece] + 200 < alpha) { // delta pruning
+		if (!(board.phaseFlag & PHASE_EG) && !(moves[i].flags & MFLAGS_PROMOTION) && standPat + pieceValues[moves[i].attackedPiece] + 200 < alpha) { // delta pruning
 			continue;
 		}
 		zobristBefore = board.zobristKey;
@@ -352,6 +354,16 @@ inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId, int p
 int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 	int score;
 	Color findMoveFor = board.sideToMove;
+
+	int pieceVal = board.getSideMaterialValue(WHITE);
+	if (pieceVal <= 1200) {
+		board.phaseFlag = PHASE_EG;
+	}
+	pieceVal = board.getSideMaterialValue(BLACK);
+	if (pieceVal <= 1200) {
+		board.phaseFlag = PHASE_EG;
+	}
+	
 	uint8_t newBest = 0;
 	uint8_t bestId = 0;
 	int alpha = -200000;
@@ -359,21 +371,23 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 	Move pvMove;
 	stopSearch = false;
 	nodeCount = 0;
-	timer.start(true, calculateTimeForMove(findMoveFor));
+	unsigned long searchLength = calculateTimeForMove(findMoveFor);
+	timer.start(true, searchLength);
 	unsigned long searchStart;
 	unsigned long long lastNodeCount = 0;
+	int currDepth;
 	decHistoryTable();
-	for (int i = 1; i <= maxDepth; i++) {
+	for (currDepth = 1; currDepth <= maxDepth; currDepth++) {
 		searchStart = timer.mseconds;
-		score = findBestMove(moves, numOfMoves, i, alpha, beta, &newBest);
+		score = findBestMove(moves, numOfMoves, currDepth, alpha, beta, &newBest);
 		if (score <= alpha) {
 			alpha -= 2 * WINDOW_SIZE;
-			i--;
+			currDepth--;
 			continue;
 		}
 		else if (score >= beta) {
 			beta += 2 * WINDOW_SIZE;
-			i--;
+			currDepth--;
 			continue;
 		}
 		alpha = score - WINDOW_SIZE;
@@ -382,23 +396,33 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 			std::cout << "TIMES UP" << std::endl;
 			break;
 		}
-		infoPV(i);
-		infoNPS(i, nodeCount - lastNodeCount, searchStart);
+		infoPV(currDepth);
+		infoNPS(currDepth, nodeCount - lastNodeCount, searchStart);
+		getSearchStats(currDepth, lastNodeCount, searchStart);
 		bestId = newBest;
+		if ((timer.mseconds - searchStart) * DEPTH_TIME_INCREASE > searchLength - timer.mseconds) { // next depth would take longer than remaining time
+			std::cout << "Ended search early as next depth would take " << (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE << " ms and we have " << searchLength - timer.mseconds << " ms remaining" << std::endl;
+			break;
+		}
 		lastNodeCount = nodeCount;
 	}
-	infoNPS(5, nodeCount, 0);
+	infoNPS(currDepth, nodeCount, 0);
+	getSearchStats(currDepth, 0, 0);
 
 	return bestId;
+}
+
+inline void Engine::getSearchStats(int searchDepth, unsigned long long prevNodeCount, unsigned long startTime) {
+	std::cout << "Search to depth " << searchDepth << " took " << timer.mseconds - startTime << " milliseconds, and searched " << nodeCount - prevNodeCount << " nodes" << std::endl;
 }
 
 inline unsigned long Engine::calculateTimeForMove(Color side) {
 	if (mode == PROTO_UCI) {
 			int timeLeft = (side == WHITE) ? wmsLeft : bmsLeft;
 			int timeInc = (side == WHITE) ? wTimeInc : bTimeInc;
-			float fractionAllowed = 0.1;
+			float fractionAllowed = 0.05;
 			if (board.halfMoveCount < 20) {
-				fractionAllowed = 0.05;
+				fractionAllowed = 0.025;
 			} // TODO, something with 0 increment
 			std::stringstream ss;
 			ss << "Gonna use " << timeLeft * fractionAllowed + timeInc << " mseconds";

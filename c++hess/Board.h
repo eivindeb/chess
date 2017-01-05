@@ -29,7 +29,7 @@ class Board {
 		int addPromotionPermutations(Move *moves, int moveNum, int sq, int tarSq, Piece attackedPiece, int flags);
 		bool inCheck(Color side);
 		int getSideMaterialValue(Color side);
-		int posFlag;
+		int phaseFlag;
 		int calculatePositionTotal();
 		void loadFromFen(std::string fen);
 		Zobrist zobrist;

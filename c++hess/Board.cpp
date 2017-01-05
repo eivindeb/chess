@@ -37,7 +37,7 @@ void Board::loadFromFen(std::string fen) {
 	}
 
 	zobristKey = 0;
-	posFlag = POS_MG;
+	phaseFlag = PHASE_MG;
 	std::stringstream ss;
 	ss.str(fen);
 	std::string item;
@@ -173,11 +173,11 @@ void Board::loadFromFen(std::string fen) {
 	}
 	int pieceVal = getSideMaterialValue(WHITE);
 	if (pieceVal <= 1200) {
-		posFlag = POS_EG;
+		phaseFlag = PHASE_EG;
 	}
 	pieceVal = getSideMaterialValue(BLACK);
 	if (pieceVal <= 1200) {
-		posFlag = POS_EG;
+		phaseFlag = PHASE_EG;
 	}
 	setPiecePositionTotal();
 	historyIndex = -1;
@@ -737,10 +737,10 @@ int Board::calculatePositionTotal() {
 			if (board[sq] != EMPTY) {
 				switch (board[sq]) {
 				case PAWN:
-					if (posFlag & POS_MG) {
+					if (phaseFlag & PHASE_MG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnMG : PSTbPawnMG;
 					}
-					else if (posFlag & POS_EG) {
+					else if (phaseFlag & PHASE_EG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnEG : PSTbPawnEG;
 					}
 					else {
@@ -749,10 +749,10 @@ int Board::calculatePositionTotal() {
 					}
 					break;
 				case KNIGHT:
-					if (posFlag & POS_MG) {
+					if (phaseFlag & PHASE_MG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightMG : PSTbKnightMG;
 					}
-					else if (posFlag & POS_EG) {
+					else if (phaseFlag & PHASE_EG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightEG : PSTbKnightEG;
 					}
 					else {
@@ -761,10 +761,10 @@ int Board::calculatePositionTotal() {
 					}
 					break;
 				case BISHOP:
-					if (posFlag & POS_MG) {
+					if (phaseFlag & PHASE_MG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopMG : PSTbBishopMG;
 					}
-					else if (posFlag & POS_EG) {
+					else if (phaseFlag & PHASE_EG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopEG : PSTbBishopEG;
 					}
 					else {
@@ -773,10 +773,10 @@ int Board::calculatePositionTotal() {
 					}
 					break;
 				case ROOK:
-					if (posFlag & POS_MG) {
+					if (phaseFlag & PHASE_MG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwRookMG : PSTbRookMG;
 					}
-					else if (posFlag & POS_EG) {
+					else if (phaseFlag & PHASE_EG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwRookEG : PSTbRookEG;
 					}
 					else {
@@ -785,10 +785,10 @@ int Board::calculatePositionTotal() {
 					}
 					break;
 				case QUEEN:
-					if (posFlag & POS_MG) {
+					if (phaseFlag & PHASE_MG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenMG : PSTbQueenMG;
 					}
-					else if (posFlag & POS_EG) {
+					else if (phaseFlag & PHASE_EG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenEG : PSTbQueenEG;
 					}
 					else {
@@ -797,10 +797,10 @@ int Board::calculatePositionTotal() {
 					}
 					break;
 				case KING:
-					if (posFlag & POS_MG) {
+					if (phaseFlag & PHASE_MG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwKingMG : PSTbKingMG;
 					}
-					else if (posFlag & POS_EG) {
+					else if (phaseFlag & PHASE_EG) {
 						tablePtr = (boardColor[sq] == WHITE) ? PSTwKingEG : PSTbKingEG;
 					}
 					else {
@@ -825,10 +825,10 @@ inline void Board::clearSq(int sq) {
 		int *tablePtr;
 		switch (board[sq]) {
 		case PAWN:
-			if (posFlag & POS_MG) {
+			if (phaseFlag & PHASE_MG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnMG : PSTbPawnMG;
 			}
-			else if (posFlag & POS_EG) {
+			else if (phaseFlag & PHASE_EG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnEG : PSTbPawnEG;
 			}
 			else {
@@ -837,10 +837,10 @@ inline void Board::clearSq(int sq) {
 			}
 			break;
 		case KNIGHT:
-			if (posFlag & POS_MG) {
+			if (phaseFlag & PHASE_MG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightMG : PSTbKnightMG;
 			}
-			else if (posFlag & POS_EG) {
+			else if (phaseFlag & PHASE_EG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightEG : PSTbKnightEG;
 			}
 			else {
@@ -849,10 +849,10 @@ inline void Board::clearSq(int sq) {
 			}
 			break;
 		case BISHOP:
-			if (posFlag & POS_MG) {
+			if (phaseFlag & PHASE_MG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopMG : PSTbBishopMG;
 			}
-			else if (posFlag & POS_EG) {
+			else if (phaseFlag & PHASE_EG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopEG : PSTbBishopEG;
 			}
 			else {
@@ -861,10 +861,10 @@ inline void Board::clearSq(int sq) {
 			}
 			break;
 		case ROOK:
-			if (posFlag & POS_MG) {
+			if (phaseFlag & PHASE_MG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwRookMG : PSTbRookMG;
 			}
-			else if (posFlag & POS_EG) {
+			else if (phaseFlag & PHASE_EG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwRookEG : PSTbRookEG;
 			}
 			else {
@@ -873,10 +873,10 @@ inline void Board::clearSq(int sq) {
 			}
 			break;
 		case QUEEN:
-			if (posFlag & POS_MG) {
+			if (phaseFlag & PHASE_MG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenMG : PSTbQueenMG;
 			}
-			else if (posFlag & POS_EG) {
+			else if (phaseFlag & PHASE_EG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenEG : PSTbQueenEG;
 			}
 			else {
@@ -885,10 +885,10 @@ inline void Board::clearSq(int sq) {
 			}
 			break;
 		case KING:
-			if (posFlag & POS_MG) {
+			if (phaseFlag & PHASE_MG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwKingMG : PSTbKingMG;
 			}
-			else if (posFlag & POS_EG) {
+			else if (phaseFlag & PHASE_EG) {
 				tablePtr = (boardColor[sq] == WHITE) ? PSTwKingEG : PSTbKingEG;
 			}
 			else {
@@ -914,10 +914,10 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 		int *tablePtr;
 		switch (piece) {
 			case PAWN:
-				if (posFlag & POS_MG) {
+				if (phaseFlag & PHASE_MG) {
 					tablePtr = (side == WHITE) ? PSTwPawnMG : PSTbPawnMG;
 				}
-				else if (posFlag & POS_EG) {
+				else if (phaseFlag & PHASE_EG) {
 					tablePtr = (side == WHITE) ? PSTwPawnEG : PSTbPawnEG;
 				}
 				else {
@@ -926,10 +926,10 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 				}
 				break;
 			case KNIGHT:
-				if (posFlag & POS_MG) {
+				if (phaseFlag & PHASE_MG) {
 					tablePtr = (side == WHITE) ? PSTwKnightMG : PSTbKnightMG;
 				}
-				else if (posFlag & POS_EG) {
+				else if (phaseFlag & PHASE_EG) {
 					tablePtr = (side == WHITE) ? PSTwKnightEG : PSTbKnightEG;
 				}
 				else {
@@ -938,10 +938,10 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 				}
 				break;
 			case BISHOP:
-				if (posFlag & POS_MG) {
+				if (phaseFlag & PHASE_MG) {
 					tablePtr = (side == WHITE) ? PSTwBishopMG : PSTbBishopMG;
 				}
-				else if (posFlag & POS_EG) {
+				else if (phaseFlag & PHASE_EG) {
 					tablePtr = (side == WHITE) ? PSTwBishopEG : PSTbBishopEG;
 				}
 				else {
@@ -950,10 +950,10 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 				}
 				break;
 			case ROOK:
-				if (posFlag & POS_MG) {
+				if (phaseFlag & PHASE_MG) {
 					tablePtr = (side == WHITE) ? PSTwRookMG : PSTbRookMG;
 				}
-				else if (posFlag & POS_EG) {
+				else if (phaseFlag & PHASE_EG) {
 					tablePtr = (side == WHITE) ? PSTwRookEG : PSTbRookEG;
 				}
 				else {
@@ -962,10 +962,10 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 				}
 				break;
 			case QUEEN:
-				if (posFlag & POS_MG) {
+				if (phaseFlag & PHASE_MG) {
 					tablePtr = (side == WHITE) ? PSTwQueenMG : PSTbQueenMG;
 				}
-				else if (posFlag & POS_EG) {
+				else if (phaseFlag & PHASE_EG) {
 					tablePtr = (side == WHITE) ? PSTwQueenEG : PSTbQueenEG;
 				}
 				else {
@@ -974,10 +974,10 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 				}
 				break;
 			case KING:
-				if (posFlag & POS_MG) {
+				if (phaseFlag & PHASE_MG) {
 					tablePtr = (side == WHITE) ? PSTwKingMG : PSTbKingMG;
 				}
-				else if (posFlag & POS_EG) {
+				else if (phaseFlag & PHASE_EG) {
 					tablePtr = (side == WHITE) ? PSTwKingEG : PSTbKingEG;
 				}
 				else {
@@ -1006,10 +1006,10 @@ inline void Board::setPiecePositionTotal() {
 			if (board[sq] != EMPTY) {
 				switch (board[sq]) {
 					case PAWN:
-						if (posFlag & POS_MG) {
+						if (phaseFlag & PHASE_MG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnMG : PSTbPawnMG;
 						}
-						else if (posFlag & POS_EG) {
+						else if (phaseFlag & PHASE_EG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwPawnEG : PSTbPawnEG;
 						}
 						else {
@@ -1018,10 +1018,10 @@ inline void Board::setPiecePositionTotal() {
 						}
 						break;
 					case KNIGHT:
-						if (posFlag & POS_MG) {
+						if (phaseFlag & PHASE_MG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightMG : PSTbKnightMG;
 						}
-						else if (posFlag & POS_EG) {
+						else if (phaseFlag & PHASE_EG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwKnightEG : PSTbKnightEG;
 						}
 						else {
@@ -1030,10 +1030,10 @@ inline void Board::setPiecePositionTotal() {
 						}
 						break;
 					case BISHOP:
-						if (posFlag & POS_MG) {
+						if (phaseFlag & PHASE_MG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopMG : PSTbBishopMG;
 						}
-						else if (posFlag & POS_EG) {
+						else if (phaseFlag & PHASE_EG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwBishopEG : PSTbBishopEG;
 						}
 						else {
@@ -1042,10 +1042,10 @@ inline void Board::setPiecePositionTotal() {
 						}
 						break;
 					case ROOK:
-						if (posFlag & POS_MG) {
+						if (phaseFlag & PHASE_MG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwRookMG : PSTbRookMG;
 						}
-						else if (posFlag & POS_EG) {
+						else if (phaseFlag & PHASE_EG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwRookEG : PSTbRookEG;
 						}
 						else {
@@ -1054,10 +1054,10 @@ inline void Board::setPiecePositionTotal() {
 						}
 						break;
 					case QUEEN:
-						if (posFlag & POS_MG) {
+						if (phaseFlag & PHASE_MG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenMG : PSTbQueenMG;
 						}
-						else if (posFlag & POS_EG) {
+						else if (phaseFlag & PHASE_EG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwQueenEG : PSTbQueenEG;
 						}
 						else {
@@ -1066,10 +1066,10 @@ inline void Board::setPiecePositionTotal() {
 						}
 						break;
 					case KING:
-						if (posFlag & POS_MG) {
+						if (phaseFlag & PHASE_MG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwKingMG : PSTbKingMG;
 						}
-						else if (posFlag & POS_EG) {
+						else if (phaseFlag & PHASE_EG) {
 							tablePtr = (boardColor[sq] == WHITE) ? PSTwKingEG : PSTbKingEG;
 						}
 						else {

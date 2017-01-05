@@ -13,8 +13,8 @@
 
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
-#define POS_MG	1
-#define POS_EG	2
+#define PHASE_MG	1
+#define PHASE_EG	2
 
 #define NW		15	
 #define NORTH	16
