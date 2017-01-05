@@ -23,7 +23,13 @@
 
 #define DEPTH_TIME_INCREASE 5
 
+#define ALLOW_NULL	true
+#define IS_PV		true
+#define NOT_PV		false
+
 #define WINDOW_SIZE pieceValues[PAWN] / 2
+
+#define R	2	//reduction depth
 
 
 Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(49999991), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
@@ -95,7 +101,15 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 			board.moveUnmake();
 			continue;
 		}
-		score = -alphaBeta(-beta, -alpha, depthLeft - 1, ply + 1);
+		if (!raisedAlpha) { // principal variation search
+			score = -alphaBeta(-beta, -alpha, depthLeft - 1, ply + 1, ALLOW_NULL, isPV);
+		}
+		else {
+			if (-alphaBeta(-alpha - 1, -alpha, depthLeft - 1, ply + 1, ALLOW_NULL, NOT_PV) > alpha) {
+				score = -alphaBeta(-beta, -alpha, depthLeft - 1, ply + 1, ALLOW_NULL, IS_PV);
+			}
+		}
+		
 		board.moveUnmake();
 		if (score > alpha) {
 			if (score >= beta) {
@@ -108,6 +122,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 			}
 			bestMoveIndex = i;
 			ttFlag = TT_EXACT;
+			raisedAlpha = true;
 			alpha = score;
 		}
 	}
@@ -303,7 +318,11 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 			board.moveUnmake();
 			continue;
 		}
-		score = -alphaBeta(-beta, -alpha, depth-1, 1);
+
+		if ((i == 0) || (-alphaBeta(-alpha - 1, -alpha, depth - 1, 1, ALLOW_NULL, NOT_PV) > alpha)) { // principal variation search
+			score = -alphaBeta(-beta, -alpha, depth - 1, 1, ALLOW_NULL, IS_PV);
+		}
+
 		board.moveUnmake();
 		if (score > alpha) {
 			alpha = score;
@@ -317,6 +336,7 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 				tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, beta, TT_BETA, moves[bestIndex]);
 				return beta;
 			}
+			//infoPV(depth);
 			tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, alpha, TT_ALPHA, moves[bestIndex]);
 		}
 	}
