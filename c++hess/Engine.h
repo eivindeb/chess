@@ -26,7 +26,7 @@ class Engine {
 		unsigned long long perft(int depth);
 		int iterativeDeepening(Move *moves, int numOfMoves);
 		Transposition tTable;
-		void infoPV(int searchLength);
+		void infoPV(int searchLength, int score);
 		void comInit();
 		int comReceive();
 		int comUCI(std::string command);
@@ -36,7 +36,7 @@ class Engine {
 		void decHistoryTable();
 		Move killers[50][2];
 		void setKillers(Move move, int ply);
-		void infoNPS(int searchDepth, unsigned long long nodes, unsigned long startTime);
+		void infoNPS(unsigned long long nodes, unsigned long startTime);
 		void getSearchStats(int searchDepth, unsigned long long prevNodeCount, unsigned long startTime);
 		HANDLE hstdin;
 		int pipe;

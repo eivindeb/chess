@@ -13,15 +13,15 @@
 
 int main()
 {	
-	Engine myengine = Engine(1, 15, "", true);
+	Engine myengine = Engine(1, 20, "", false);
 	/*Move moves[218];
 	int numOfMoves;
 	int index;
 	std::stringstream moveStream;*/
 
-	//while (1) {
+	while (1) {
 		//do nothing
-	//}
+	}
 
 	/*while (1) {
 		switch (com.receive()) {

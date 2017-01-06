@@ -9,6 +9,7 @@ Timer::Timer() {
 
 void Timer::start(bool fromStart, unsigned long duration) {
 	timesUp = false;
+	timerStop = false;
 	if (fromStart == true) {
 		mseconds = 0;
 	}
@@ -19,14 +20,19 @@ void Timer::start(bool fromStart, unsigned long duration) {
 	t1.detach();
 }
 
+void Timer::stop() {
+	timerStop = 0;
+}
+
 void Timer::incTimer() {
-	while (mseconds < msecondsMax) {
+	while (mseconds < msecondsMax && !timerStop) {
 		auto start = std::chrono::high_resolution_clock::now();
 		std::this_thread::sleep_for(std::chrono::milliseconds(20));
 		auto end = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double, std::milli> elapsed = end - start;
 		mseconds += elapsed.count();
 	}
-	timesUp = true;
-	return;
+	if (!timerStop) {
+		timesUp = true;
+	}
 }
