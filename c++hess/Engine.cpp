@@ -91,7 +91,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 
 	sortMoves(moves, numOfMoves, ttMove.id, ply);
 
-	if (!(nodeCount & 4000) && timer.timesUp) {
+	if (!(nodeCount & 4000) && (timer.timesUp || stopSearch)) {
 		return 0;
 	}
 
@@ -367,7 +367,7 @@ inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId, int p
 				orderingValues[moves[i].id] += KILLER_ORDER;
 			}
 			else if (moves[i].fromSq == killers[ply][KILLER_SECONDARY].fromSq && moves[i].toSq == killers[ply][KILLER_SECONDARY].toSq) {
-				orderingValues[moves[i].id] += KILLER_ORDER - 1000;
+				orderingValues[moves[i].id] += KILLER_ORDER - 10;
 			}
 			else {
 				orderingValues[moves[i].id] += historyMoves[moves[i].fromSq][moves[i].toSq];
@@ -443,10 +443,90 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 		}
 		lastNodeCount = nodeCount;
 	}
-	//infoNPS(nodeCount, 0);
-	getSearchStats(-1, 0, 0);
+	infoNPS(nodeCount, 0);
+	//getSearchStats(-1, 0, 0);
 
 	return bestId;
+}
+
+int Engine::SEE(int sq) {
+	int wAttackers[20]; // TODO really hoping we never go over 16 here
+	int bAttackers[20];
+
+	int numOfwAttackers = board.getSqAttackers(wAttackers, sq, WHITE);
+	int numOfbAttackers = board.getSqAttackers(bAttackers, sq, BLACK);
+
+	std::sort(wAttackers, wAttackers + numOfwAttackers, [this](int lhs, int rhs) {return pieceSorting[board.board[lhs]] < pieceSorting[board.board[rhs]]; });
+	std::sort(bAttackers, bAttackers + numOfbAttackers, [this](int lhs, int rhs) {return pieceSorting[board.board[lhs]] < pieceSorting[board.board[rhs]]; });
+
+	int pieceAtSq = board.board[sq];
+	int sideToMove = board.sideToMove;
+	int score = 0;
+	int newAttackerSq;
+	bool inserted;
+
+	int i = 0;
+
+	while ((sideToMove == WHITE && i < numOfwAttackers) || (sideToMove == BLACK && i < numOfbAttackers)) {
+		newAttackerSq = -1;
+		score += pieceValues[pieceAtSq] * sideToMove * board.sideToMove;
+		if (sideToMove == WHITE) {
+			pieceAtSq = board.board[wAttackers[i]];
+			if (board.board[wAttackers[i]] != KING && board.board[wAttackers[i]] != KNIGHT) // no piece can be hiding behind a king or knight and still attack sq
+				newAttackerSq = board.getSqOfFirstPieceOnRay(wAttackers[i], dirBySquareDiff[sq - wAttackers[i] + 119]);
+		}
+		else {
+			pieceAtSq = board.board[bAttackers[i]];
+			if (board.board[bAttackers[i]] != KING && board.board[bAttackers[i]] != KNIGHT) // no piece can be hiding behind a king or knight and still attack sq
+				newAttackerSq = board.getSqOfFirstPieceOnRay(bAttackers[i], dirBySquareDiff[sq - bAttackers[i] + 119]);
+		}
+		// find hidden attackers
+		if (newAttackerSq != -1) {
+			inserted = false;
+			if (attackArray[sq - newAttackerSq + 128] & attackGroups[board.board[newAttackerSq]]) {
+				if (board.boardColor[newAttackerSq] == WHITE) {
+					for (int j = (sideToMove != board.sideToMove) ? i : i + 1; j < numOfwAttackers; j++) {
+						if (pieceSorting[board.board[newAttackerSq]] < pieceSorting[wAttackers[j]]) {
+							for (int k = numOfwAttackers; k > j; k--) {
+								wAttackers[k] = wAttackers[k - 1];
+							}
+							wAttackers[j] = newAttackerSq;
+							inserted = true;
+							break;
+						}
+					}
+
+					if (!inserted) { // the current highest value, therefore insert last
+						wAttackers[numOfwAttackers] = newAttackerSq;
+					}
+
+					numOfwAttackers++;
+				}
+				else {
+					for (int j = (sideToMove != board.sideToMove) ? i : i + 1; j < numOfbAttackers; j++) {
+						if (pieceSorting[board.board[newAttackerSq]] < pieceSorting[bAttackers[j]]) {
+							for (int k = numOfbAttackers; k > j; k--) {
+								bAttackers[k] = bAttackers[k - 1];
+							}
+							bAttackers[j] = newAttackerSq;
+							inserted = true;
+							break;
+						}
+					}
+
+					if (!inserted) { // the current highest value, therefore insert last
+						bAttackers[numOfbAttackers] = newAttackerSq;
+					}
+					numOfbAttackers++;
+				}
+			}
+		}
+
+		sideToMove *= (-1);
+		if (sideToMove == board.sideToMove) i++;
+	}
+
+	return score;
 }
 
 inline void Engine::getSearchStats(int searchDepth, unsigned long long prevNodeCount, unsigned long startTime) {
@@ -473,9 +553,9 @@ inline unsigned long Engine::calculateTimeForMove(Color side) {
 			if (timeLeft == -1) { //not timed game
 				return FIXED_SEARCH_DURATION;
 			}
-			float fractionAllowed = 0.05;
+			float fractionAllowed = 0.08;
 			if (board.halfMoveCount < 20) {
-				fractionAllowed = 0.025;
+				fractionAllowed = 0.04;
 			} // TODO, something with 0 increment
 			std::stringstream ss;
 			ss << "Gonna use " << timeLeft * fractionAllowed + 0.8*timeInc << " mseconds";
@@ -536,7 +616,7 @@ void Engine::infoPV(int searchDepth, int score) {
 			pvString = std::to_string(evaluatePosition()*board.sideToMove) + "\t" + pvSS.str();
 			break;
 		case PROTO_UCI:
-			pvSS << evaluatePosition()*board.sideToMove;
+			pvSS << "score cp " << evaluatePosition()*board.sideToMove;
 			break;
 		}
 	}
@@ -649,7 +729,6 @@ int Engine::comUCI(std::string command) {
 	}
 	else if (command == "ucinewgame") {
 		board = Board();
-		
 	}
 	else {
 		std::string buf; // Have a buffer string

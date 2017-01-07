@@ -38,6 +38,7 @@ class Engine {
 		void setKillers(Move move, int ply);
 		void infoNPS(unsigned long long nodes, unsigned long startTime);
 		void getSearchStats(int searchDepth, unsigned long long prevNodeCount, unsigned long startTime);
+		int SEE(int sq);
 		HANDLE hstdin;
 		int pipe;
 		Task task;

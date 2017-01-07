@@ -21,7 +21,7 @@ void Timer::start(bool fromStart, unsigned long duration) {
 }
 
 void Timer::stop() {
-	timerStop = 0;
+	timerStop = true;
 }
 
 void Timer::incTimer() {

@@ -3,6 +3,7 @@
 class Board {
 	public:
 		Board(std::string fen = "false");
+		int getSqOfFirstPieceOnRay(int fromSq, int ray);
 		Piece board[128];
 		Color boardColor[128];
 		Color sideToMove;

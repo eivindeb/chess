@@ -448,6 +448,17 @@ int Board::getLegalMovesInCheck(Move *moves) {
 	return numOfMoves;
 }
 
+int Board::getSqOfFirstPieceOnRay(int fromSq, int ray) {
+	int newPos = fromSq;
+	while (((newPos += ray) & 0x88) == 0) {
+		if (board[newPos] != EMPTY) {
+			return newPos;
+		}
+	}
+
+	return -1;
+}
+
 int Board::getCaptureMoves(Move *moves) {
 	int movesInPosition = 0;
 	int newPos;

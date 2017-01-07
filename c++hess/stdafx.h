@@ -424,19 +424,14 @@ struct TranspositionEntry {
 };
 
 /* move is on the form:
-	initial square	(0-6 bit)
+	initial square	(0-6 bit) 
 	target square	(7-13 bit)
-	capture			(14 bit)
-	movedpiece		(15-17 bit)
-	attacked		(18-20 bit)
+	movedpiece		(14-16 bit)
+	attacked		(17-19 bit)
+	capture			(20 bit)
 	en passant		(21 bit)
 	promotion		(22 bit)
 	promoted to		(23-25 bit)
-	---------------------------
-	(in history)
-	enPassantbit	(26-33 bit)
-	wCastleRights	(34-36 bit)
-	bCastleRights	(37-39 bit)
 */
 
 // TODO: reference additional headers your program requires here

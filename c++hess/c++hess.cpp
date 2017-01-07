@@ -13,11 +13,13 @@
 
 int main()
 {	
-	Engine myengine = Engine(1, 20, "", false);
+	Engine myengine = Engine(1, 20, "BN6/7k/2P5/1P6/8/2q4K/2r5/2r5 b KQkq -", true);
 	/*Move moves[218];
 	int numOfMoves;
 	int index;
 	std::stringstream moveStream;*/
+
+	int score = myengine.SEE(82);
 
 	while (1) {
 		//do nothing
