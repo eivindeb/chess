@@ -591,9 +591,9 @@ inline unsigned long Engine::calculateTimeForMove(Color side) {
 			if (timeLeft == -1) { //not timed game
 				return FIXED_SEARCH_DURATION;
 			}
-			float fractionAllowed = 0.08;
+			float fractionAllowed = (timeInc > 0) ? 0.08 : 0.04;
 			if (board.halfMoveCount < 20) {
-				fractionAllowed = 0.04;
+				fractionAllowed = fractionAllowed / 2;
 			} // TODO, something with 0 increment
 			std::stringstream ss;
 			ss << "Gonna use " << timeLeft * fractionAllowed + 0.8*timeInc << " mseconds";

@@ -423,6 +423,32 @@ struct TranspositionEntry {
 	TT_FLAG flag;
 };
 
+#define MOVE_FROM_SQ_MASK			0x7f
+#define MOVE_TO_SQ_MASK				0x3f80
+#define MOVE_MOVED_PIECE_MASK		0x1c000
+#define MOVE_ATTACKED_PIECE_MASK	0xe0000
+#define MOVE_CAPTURE_MASK			0x100000
+#define MOVE_EN_PASSANT_MASK		0x200000
+#define MOVE_PROMOTION_MASK			0x400000
+#define MOVE_PROMOTED_TO_MASK		0x3800000
+#define MOVE_CASTLE_LONG_MASK		0x4000000
+#define MOVE_CASTLE_SHORT_MASK		0x8000000
+
+#define MOVE_FROM_SQ_SHIFT			0
+#define MOVE_TO_SQ_SHIFT			7
+#define MOVE_MOVED_PIECE_SHIFT		14
+#define MOVE_ATTACKED_PIECE_SHIFT	17
+#define MOVE_CAPTURE_SHIFT			20
+#define MOVE_EN_PASSANT_SHIFT		21
+#define MOVE_PROMOTION_SHIFT		22
+#define MOVE_PROMOTED_TO_SHIFT		23
+#define MOVE_CASTLE_LONG_SHIFT		26
+#define MOVE_CASTLE_SHORT_SHIFT		27
+
+#define MOVE_CASTLE_SHORT		0b10
+#define MOVE_CASTLE_LONG		0b01
+
+
 /* move is on the form:
 	initial square	(0-6 bit) 
 	target square	(7-13 bit)
@@ -432,6 +458,10 @@ struct TranspositionEntry {
 	en passant		(21 bit)
 	promotion		(22 bit)
 	promoted to		(23-25 bit)
+	castle long		(26 bit)
+	castle short	(27 bit)
+	null move
+
 */
 
 // TODO: reference additional headers your program requires here
