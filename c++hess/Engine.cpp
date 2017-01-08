@@ -14,6 +14,7 @@
 #define CPT_ORDER		5000
 #define PROMOTION_ORDER	5000
 #define KILLER_ORDER	1000
+#define SEE_ORDER_DEPTH	0
 
 #define DRAW_OPENING	-10
 #define DRAW_ENDGAME	0
@@ -22,7 +23,7 @@
 #define KILLER_PRIMARY		0
 #define KILLER_SECONDARY	1
 
-#define DEPTH_TIME_INCREASE 3
+#define DEPTH_TIME_INCREASE 2
 
 #define ALLOW_NULL	true
 #define IS_PV		true
@@ -32,9 +33,11 @@
 
 #define R	2	//reduction depth
 
-#define FIXED_SEARCH_DURATION	15*1000;
+#define FIXED_SEARCH_DURATION	30*1000;
 
-Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(49999991), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
+//49999991
+
+Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(4194311), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
 	if (!console) {
@@ -57,15 +60,19 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTa
 
 int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNull, bool isPV) {
 	nodeCount++;
+	bool inCheck = board.inCheck(board.sideToMove);
+	if (inCheck) depthLeft++; // in check extension
 	if (depthLeft == 0) return quiescence(alpha, beta);
 
 	Move moves[218];
-	Move ttMove = Move{ (uint8_t) 0, (uint8_t) 0, EMPTY, EMPTY, 0, (uint8_t) NO_ID };
+	Move ttMove = Move{ (uint8_t)0, (uint8_t)0, EMPTY, EMPTY, 0, (uint8_t)NO_ID };
 	int score = 0;
 	int bestMoveIndex = 0;
 	int ttVal = 0;
-	bool inCheck = board.inCheck(board.sideToMove);
 	bool raisedAlpha = false;
+	bool fPrune = false;
+
+	int newDepth = depthLeft - 1;
 
 	TT_FLAG ttFlag = TT_ALPHA;
 	if ((ttVal = tTable.probe(board.zobristKey, depthLeft, alpha, beta, &ttMove)) != INVALID) {
@@ -74,10 +81,20 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 
 	if (depthLeft > 2 && allowNull && !(board.phaseFlag & PHASE_EG) && !isPV && !inCheck) { // null move pruning
 		board.moveMakeNull();
-		score = -alphaBeta(-beta, -beta + 1, depthLeft - 1 - R, ply, !ALLOW_NULL, NOT_PV);
+		score = -alphaBeta(-beta, -beta + 1, newDepth - R, ply, !ALLOW_NULL, NOT_PV);
 		board.moveUnmakeNull();
 		if (score >= beta) return beta;
 	}
+
+	/*if (depthLeft == 1 && !inCheck && (evaluatePosition() + pieceValues[BISHOP]) < alpha) { // futility pruning
+		fPrune = true;
+	}
+	else if (depthLeft == 2 && !inCheck && (evaluatePosition() + pieceValues[ROOK]) < alpha) {
+		fPrune = true;
+	}
+	else if (depthLeft == 3 && !inCheck && (evaluatePosition() + pieceValues[QUEEN]) < alpha) {
+		fPrune = true;
+	}*/
 
 	int numOfMoves = 0;
 	if (inCheck) {
@@ -85,7 +102,6 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 		if (numOfMoves == 0) {
 			return -(MATE_SCORE - ply);
 		}
-		depthLeft++; // in check extension
 	}
 	else numOfMoves = board.getLegalMoves(moves);
 
@@ -103,12 +119,23 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 			board.moveUnmake();
 			continue;
 		}
+		newDepth = depthLeft - 1;
+
+		if (i >= 4 && !isPV && depthLeft >= 3 && !(moves[i].flags & MFLAGS_CPT) && !(moves[i].flags & MFLAGS_PROMOTION) && !(board.inCheck(board.sideToMove))) {
+			newDepth--;
+		}
+
+		/*if (fPrune && !(moves[i].flags & MFLAGS_CPT) && !(moves[i].flags & MFLAGS_PROMOTION) && !(board.inCheck(board.sideToMove))) { // futility pruning
+			board.moveUnmake();
+			continue;
+		}*/
+
 		if (!raisedAlpha) { // principal variation search
-			score = -alphaBeta(-beta, -alpha, depthLeft - 1, ply + 1, ALLOW_NULL, isPV);
+			score = -alphaBeta(-beta, -alpha, newDepth, ply + 1, ALLOW_NULL, isPV);
 		}
 		else {
-			if (-alphaBeta(-alpha - 1, -alpha, depthLeft - 1, ply + 1, ALLOW_NULL, NOT_PV) > alpha) {
-				score = -alphaBeta(-beta, -alpha, depthLeft - 1, ply + 1, ALLOW_NULL, IS_PV);
+			if (-alphaBeta(-alpha - 1, -alpha, newDepth, ply + 1, ALLOW_NULL, NOT_PV) > alpha) {
+				score = -alphaBeta(-beta, -alpha, newDepth, ply + 1, ALLOW_NULL, IS_PV);
 			}
 		}
 		
@@ -146,14 +173,15 @@ int Engine::quiescence(int alpha, int beta) {
 	//TODO might have to check for in check here??
 	Move moves[218];
 	int score = 0;
-	unsigned long long zobristBefore = 0;
 	int numOfCaptures = board.getCaptureMoves(moves);
 	mvvLva(moves, numOfCaptures);
 	for (int i = 0; i < numOfCaptures; i++) {
 		if (!(board.phaseFlag & PHASE_EG) && !(moves[i].flags & MFLAGS_PROMOTION) && standPat + pieceValues[moves[i].attackedPiece] + 200 < alpha) { // delta pruning
 			continue;
 		}
-		zobristBefore = board.zobristKey;
+		//if (SEE(moves[i].toSq) < 0) {
+		//	continue;
+		//}
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) {
 			board.moveUnmake();
@@ -161,9 +189,6 @@ int Engine::quiescence(int alpha, int beta) {
 		}
 		score = -quiescence(-beta, -alpha);
 		board.moveUnmake();
-		if (board.zobristKey != zobristBefore) {
-			zobristBefore = 0;
-		}
 
 		if (score >= beta) {
 			return beta;
@@ -345,9 +370,19 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId, int ply) {
 	int orderingValues[218] = { 0 };
 	for (int i = 0; i < numOfMoves; i++) {
+		if (bestMoveId != 0 && bestMoveId != NO_ID && moves[i].id == bestMoveId) {
+			orderingValues[moves[i].id] += HASH_ORDER;
+			continue;
+		}
 		if (moves[i].flags & MFLAGS_CPT || moves[i].flags & MFLAGS_PROMOTION) {
 			if (moves[i].flags & MFLAGS_CPT) {
-				orderingValues[moves[i].id] += (pieceValues[moves[i].attackedPiece] - pieceValues[moves[i].movedPiece]) + CPT_ORDER;
+				if (ply <= SEE_ORDER_DEPTH) {
+					orderingValues[moves[i].id] += SEE(moves[i].toSq);
+					orderingValues[moves[i].id] += (orderingValues[moves[i].id] > 0) ? CPT_ORDER : 0;
+				}
+				else {
+					orderingValues[moves[i].id] += (pieceValues[moves[i].attackedPiece] - pieceValues[moves[i].movedPiece]) + CPT_ORDER;
+				}
 			}
 			else {
 				if (moves[i].flags & MFLAGS_PROMOTION_QUEEN) {
@@ -367,14 +402,11 @@ inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId, int p
 				orderingValues[moves[i].id] += KILLER_ORDER;
 			}
 			else if (moves[i].fromSq == killers[ply][KILLER_SECONDARY].fromSq && moves[i].toSq == killers[ply][KILLER_SECONDARY].toSq) {
-				orderingValues[moves[i].id] += KILLER_ORDER - 10;
+				orderingValues[moves[i].id] += KILLER_ORDER - 1;
 			}
 			else {
 				orderingValues[moves[i].id] += historyMoves[moves[i].fromSq][moves[i].toSq];
 			}
-		}
-		if (bestMoveId != 0 && bestMoveId != NO_ID && moves[i].id == bestMoveId) {
-			orderingValues[moves[i].id] += HASH_ORDER;
 		}
 	}
 	std::sort(moves, moves + numOfMoves, [&orderingValues](Move lhs, Move rhs) {return orderingValues[lhs.id] > orderingValues[rhs.id]; });
@@ -434,7 +466,7 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 		}
 		infoNPS(nodeCount - lastNodeCount, searchStart);
 		infoPV(currDepth, INVALID);
-		//getSearchStats(currDepth, lastNodeCount, searchStart);
+		getSearchStats(currDepth, lastNodeCount, searchStart);
 		bestId = newBest;
 		if (wmsLeft != -1 && (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE > searchLength - timer.mseconds) { // next depth would take longer than remaining time
 			std::cout << "Ended search early as next depth would take " << (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE << " ms and we have " << searchLength - timer.mseconds << " ms remaining" << std::endl;
@@ -444,12 +476,12 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 		lastNodeCount = nodeCount;
 	}
 	infoNPS(nodeCount, 0);
-	//getSearchStats(-1, 0, 0);
+	getSearchStats(-1, 0, 0);
 
 	return bestId;
 }
 
-int Engine::SEE(int sq) {
+int Engine::SEE(int sq) { // TODO, can check for only legal moves, but this will slow down and might not be necessary as SEE is only used as a guideline
 	int wAttackers[20]; // TODO really hoping we never go over 16 here
 	int bAttackers[20];
 
@@ -469,15 +501,21 @@ int Engine::SEE(int sq) {
 
 	while ((sideToMove == WHITE && i < numOfwAttackers) || (sideToMove == BLACK && i < numOfbAttackers)) {
 		newAttackerSq = -1;
+		if (sideToMove == WHITE && board.board[wAttackers[i]] == KING && numOfbAttackers - i > 0) {
+			break; // piece is defended so king cant attack
+		}
+		else if (sideToMove == BLACK && board.board[bAttackers[i]] == KING && numOfwAttackers - i > 0) {
+			break; 
+		}
 		score += pieceValues[pieceAtSq] * sideToMove * board.sideToMove;
 		if (sideToMove == WHITE) {
 			pieceAtSq = board.board[wAttackers[i]];
-			if (board.board[wAttackers[i]] != KING && board.board[wAttackers[i]] != KNIGHT) // no piece can be hiding behind a king or knight and still attack sq
+			if (board.board[wAttackers[i]] != KNIGHT) // no piece can be hiding behind a king or knight and still attack sq
 				newAttackerSq = board.getSqOfFirstPieceOnRay(wAttackers[i], dirBySquareDiff[sq - wAttackers[i] + 119]);
 		}
 		else {
 			pieceAtSq = board.board[bAttackers[i]];
-			if (board.board[bAttackers[i]] != KING && board.board[bAttackers[i]] != KNIGHT) // no piece can be hiding behind a king or knight and still attack sq
+			if (board.board[bAttackers[i]] != KNIGHT) // no piece can be hiding behind a king or knight and still attack sq
 				newAttackerSq = board.getSqOfFirstPieceOnRay(bAttackers[i], dirBySquareDiff[sq - bAttackers[i] + 119]);
 		}
 		// find hidden attackers
@@ -485,8 +523,8 @@ int Engine::SEE(int sq) {
 			inserted = false;
 			if (attackArray[sq - newAttackerSq + 128] & attackGroups[board.board[newAttackerSq]]) {
 				if (board.boardColor[newAttackerSq] == WHITE) {
-					for (int j = (sideToMove != board.sideToMove) ? i : i + 1; j < numOfwAttackers; j++) {
-						if (pieceSorting[board.board[newAttackerSq]] < pieceSorting[wAttackers[j]]) {
+					for (int j = (sideToMove != board.sideToMove) ? i + 1 : i; j < numOfwAttackers; j++) {
+						if (pieceSorting[board.board[newAttackerSq]] < pieceSorting[board.board[wAttackers[j]]]) {
 							for (int k = numOfwAttackers; k > j; k--) {
 								wAttackers[k] = wAttackers[k - 1];
 							}
@@ -503,8 +541,8 @@ int Engine::SEE(int sq) {
 					numOfwAttackers++;
 				}
 				else {
-					for (int j = (sideToMove != board.sideToMove) ? i : i + 1; j < numOfbAttackers; j++) {
-						if (pieceSorting[board.board[newAttackerSq]] < pieceSorting[bAttackers[j]]) {
+					for (int j = (sideToMove != board.sideToMove) ? i + 1 : i; j < numOfbAttackers; j++) {
+						if (pieceSorting[board.board[newAttackerSq]] < pieceSorting[board.board[bAttackers[j]]]) {
 							for (int k = numOfbAttackers; k > j; k--) {
 								bAttackers[k] = bAttackers[k - 1];
 							}
