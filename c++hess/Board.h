@@ -41,7 +41,7 @@ class Board {
 		unsigned long long repStack[1024];
 		int	repIndex;
 	private:
-		void moveAdd(int *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int capture, int enPassant, int promotion, Piece promotedTo, int castle);
+		void moveAdd(int *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int capture);
 		int wKingSq;
 		int bKingSq;
 		void setPiecePositionTotal();

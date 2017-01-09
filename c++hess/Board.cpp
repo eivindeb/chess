@@ -201,24 +201,28 @@ int Board::getLegalMoves(int *moves) {
 	if (sideToMove == WHITE) {
 		if (wCastlingRights & CASTLE_SHORT) {
 			if (board[4 + EAST] == EMPTY && board[4 + 2 * EAST] == EMPTY && !sqIsAttacked(4 + EAST, Color(sideToMove*(-1))) && !sqIsAttacked(4 + EAST*2, Color(sideToMove*(-1)))) {
-				moveAdd(moves, movesInPosition++, 4, 6, KING, EMPTY, 0, 0, 0, EMPTY, MOVE_CASTLE_SHORT);
+				moveAdd(moves, movesInPosition, 4, 6, KING, EMPTY, 0);
+				moves[movesInPosition++] |= (MOVE_CASTLE_SHORT << MOVE_CASTLE_LONG_SHIFT);
 			}
 		}
 		if (wCastlingRights & CASTLE_LONG) {
 			if (board[4 + WEST] == EMPTY && board[4 + 2 * WEST] == EMPTY && board[4 + 3 * WEST] == EMPTY && !sqIsAttacked(4 + WEST, Color(sideToMove*(-1))) && !sqIsAttacked(4 + 2 * WEST, Color(sideToMove*(-1)))) {
-				moveAdd(moves, movesInPosition++, 4, 2, KING, EMPTY, 0, 0, 0, EMPTY, MOVE_CASTLE_LONG);
+				moveAdd(moves, movesInPosition, 4, 2, KING, EMPTY, 0);
+				moves[movesInPosition++] |= (MOVE_CASTLE_LONG << MOVE_CASTLE_LONG_SHIFT);
 			}
 		}
 	}
 	else {
 		if (bCastlingRights & CASTLE_SHORT) {
 			if (board[116 + EAST] == EMPTY && board[116 + 2 * EAST] == EMPTY && !sqIsAttacked(116 + EAST, Color(sideToMove*(-1))) && !sqIsAttacked(116 + 2 * EAST, Color(sideToMove*(-1)))) {
-				moveAdd(moves, movesInPosition++, 116, 118, KING, EMPTY, 0, 0, 0, EMPTY, MOVE_CASTLE_SHORT);
+				moveAdd(moves, movesInPosition, 116, 118, KING, EMPTY, 0);
+				moves[movesInPosition++] |= (MOVE_CASTLE_SHORT << MOVE_CASTLE_LONG_SHIFT);
 			}
 		}
 		if (bCastlingRights & CASTLE_LONG) {
 			if (board[116 + WEST] == EMPTY && board[116 + 2 * WEST] == EMPTY && board[116 + 3 * WEST] == EMPTY && !sqIsAttacked(116 + WEST, Color(sideToMove*(-1))) && !sqIsAttacked(116 + 2 * WEST, Color(sideToMove*(-1)))) {
-				moveAdd(moves, movesInPosition++, 116, 114, KING, EMPTY, 0, 0, 0, EMPTY, MOVE_CASTLE_LONG);
+				moveAdd(moves, movesInPosition, 116, 114, KING, EMPTY, 0);
+				moves[movesInPosition++] |= (MOVE_CASTLE_LONG << MOVE_CASTLE_LONG_SHIFT);
 			}
 		}
 	}
@@ -231,7 +235,7 @@ int Board::getLegalMoves(int *moves) {
 						int dirMod = (sideToMove == WHITE) ? 0 : 4;
 						if ((sideToMove == WHITE && sq / 16 == 1) || (sideToMove == BLACK && sq / 16 == 6)) {
 							if (board[sq + pieceDeltas[PAWN][dirMod + 3]] == EMPTY && board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, 0, 0, 0, EMPTY, 0);
+								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, 0);
 							}
 						}
 						if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod]) && boardColor[sq + pieceDeltas[PAWN][dirMod]] == (sideToMove*(-1))) {
@@ -239,7 +243,7 @@ int Board::getLegalMoves(int *moves) {
 								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], board[sq + pieceDeltas[PAWN][dirMod]], 1);
 							}
 							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[sq + pieceDeltas[PAWN][dirMod]], 1, 0, 0, EMPTY, 0);
+								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[sq + pieceDeltas[PAWN][dirMod]], 1);
 							}
 						}
 						if (board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
@@ -247,23 +251,25 @@ int Board::getLegalMoves(int *moves) {
 								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 1], board[sq + pieceDeltas[PAWN][dirMod + 1]], 0);
 							}
 							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 1]], 0, 0, 0, EMPTY, 0);
+								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 1]], 0);
 							}
 						}
 						if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod + 2]) && boardColor[sq + pieceDeltas[PAWN][dirMod + 2]] == (sideToMove*(-1))) {
 							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], board[sq + pieceDeltas[PAWN][dirMod + 2]], MFLAGS_CPT);
+								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
 							}
 							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 2]], MFLAGS_CPT + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
 							}
 						}
 						if (enPassant != -1) {
 							if ((sq + pieceDeltas[PAWN][dirMod]) == enPassant) {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, MFLAGS_CPT + MFLAGS_ENP + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, 1);
+								moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
 							}
 							else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, MFLAGS_CPT + MFLAGS_ENP + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, 1);
+								moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
 							}
 						}
 					}
@@ -272,7 +278,7 @@ int Board::getLegalMoves(int *moves) {
 							newPos = sq + pieceDeltas[board[sq]][dir];
 							if (ON_BOARD(newPos)) {
 								if (boardColor[newPos] == sideToMove*(-1)) {
-									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], MFLAGS_CPT);
+									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
 								}
 								else if (board[newPos] == EMPTY) {
 									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], EMPTY, 0);
@@ -289,7 +295,7 @@ int Board::getLegalMoves(int *moves) {
 						while (((newPos += pieceDeltas[board[sq]][dir]) & 0x88) == 0) {
 							if (board[newPos] != EMPTY) {
 								if (boardColor[newPos] == sideToMove*(-1)) {
-									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], MFLAGS_CPT);
+									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
 								}
 								break;
 							}
@@ -302,14 +308,6 @@ int Board::getLegalMoves(int *moves) {
 	}
 
 	return movesInPosition;
-}
-
-inline int Board::addPromotionPermutations(int *moves, int moveNum, int sq, int tarSq, Piece attackedPiece, int capture) {
-	moveAdd(moves, moveNum++, sq, tarSq, PAWN, attackedPiece, capture, 0, 1, QUEEN, 0);
-	moveAdd(moves, moveNum++, sq, tarSq, PAWN, attackedPiece, capture, 0, 1, ROOK, 0);
-	moveAdd(moves, moveNum++, sq, tarSq, PAWN, attackedPiece, capture, 0, 1, BISHOP, 0);
-	moveAdd(moves, moveNum++, sq, tarSq, PAWN, attackedPiece, capture, 0, 1, KNIGHT, 0);
-	return moveNum;
 }
 
 int Board::getLegalMovesInCheck(int *moves) {
@@ -327,7 +325,7 @@ int Board::getLegalMovesInCheck(int *moves) {
 			boardColor[newPos] = sideToMove;
 			if (!sqIsAttacked(newPos, Color(sideToMove*(-1)), kingSq)) {
 				if (board[newPos] != EMPTY) {
-					moveAdd(moves, numOfMoves++, kingSq, newPos, KING, board[newPos], MFLAGS_CPT);
+					moveAdd(moves, numOfMoves++, kingSq, newPos, KING, board[newPos], 1);
 				}
 				else {
 					moveAdd(moves, numOfMoves++, kingSq, newPos, KING, EMPTY, 0);
@@ -362,7 +360,7 @@ int Board::getLegalMovesInCheck(int *moves) {
 						if (numOfLegalSquares > 1) {
 							if (((sideToMove == WHITE && sq / 16 == 1) || (sideToMove == BLACK && sq / 16 == 6)) && board[(sq + pieceDeltas[PAWN][dirMod + 1])] == EMPTY) {
 								if (std::any_of(legalSquares, legalSquares + numOfLegalSquares - 1, [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 3]; })) {
-									moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, MFLAGS_PAWN_MOVE + MFLAGS_PAWN_DOUBLE);
+									moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, 0);
 								}
 							}
 							if (std::any_of((legalSquares), legalSquares + numOfLegalSquares - 1, [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 1]; })) {
@@ -370,33 +368,35 @@ int Board::getLegalMovesInCheck(int *moves) {
 									numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod + 1], EMPTY, 0);
 								}
 								else {
-									moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, EMPTY, MFLAGS_PAWN_MOVE);
+									moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, EMPTY, 0);
 								}	
 							}
 						}
 						
 						if (sq + pieceDeltas[PAWN][dirMod] == attackers[0]) {
 							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, attackers[0], board[attackers[0]], MFLAGS_CPT);
+								numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, attackers[0], board[attackers[0]], 1);
 							}
 							else {
-								moveAdd(moves, numOfMoves++, sq, attackers[0], PAWN, board[attackers[0]], MFLAGS_CPT + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, numOfMoves++, sq, attackers[0], PAWN, board[attackers[0]], 1);
 							}
 						}
 						else if (sq + pieceDeltas[PAWN][dirMod + 2] == attackers[0]) {
 							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, attackers[0], board[attackers[0]], MFLAGS_CPT);
+								numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, attackers[0], board[attackers[0]], 1);
 							}
 							else {
-								moveAdd(moves, numOfMoves++, sq, attackers[0], PAWN, board[attackers[0]], MFLAGS_CPT + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, numOfMoves++, sq, attackers[0], PAWN, board[attackers[0]], 1);
 							}
 						}
 						else if (enPassant != -1 && (board[attackers[0]] == PAWN || std::any_of(legalSquares, legalSquares + numOfLegalSquares, [=](int i) {return i == enPassant; }))) {
 							if (sq + pieceDeltas[PAWN][dirMod] == enPassant) {
-								moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[attackers[0]], MFLAGS_ENP + MFLAGS_CPT + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[attackers[0]], 0);
+								moves[numOfMoves++] |= (1 << MOVE_EN_PASSANT_SHIFT);
 							}
 							else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
-								moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[attackers[0]], MFLAGS_ENP + MFLAGS_CPT + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[attackers[0]], 1);
+								moves[numOfMoves++] |= (1 << MOVE_EN_PASSANT_SHIFT);
 							}
 						}
 						continue;
@@ -413,7 +413,7 @@ int Board::getLegalMovesInCheck(int *moves) {
 							for (int dir = 0; dir < 8; dir++) {
 								if (std::any_of(legalSquares, legalSquares + numOfLegalSquares, [=](int i) {return i == sq + pieceDeltas[board[sq]][dir]; })) {
 									if (sq + pieceDeltas[board[sq]][dir] == attackers[0]) {
-										moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[board[sq]][dir], board[sq], board[attackers[0]], MFLAGS_CPT);
+										moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[board[sq]][dir], board[sq], board[attackers[0]], 1);
 									}
 									else {
 										moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[board[sq]][dir], board[sq], EMPTY, 0);
@@ -427,7 +427,7 @@ int Board::getLegalMovesInCheck(int *moves) {
 								while (((newPos += pieceDeltas[board[sq]][dir]) & 0x88) == 0) {
 									if (std::any_of(legalSquares, legalSquares + numOfLegalSquares, [=](int i) {return i == newPos; })) {
 										if (newPos == attackers[0]) {
-											moveAdd(moves, numOfMoves++, sq, newPos, board[sq], board[newPos], MFLAGS_CPT);
+											moveAdd(moves, numOfMoves++, sq, newPos, board[sq], board[newPos], 1);
 										}
 										else {
 											moveAdd(moves, numOfMoves++, sq, newPos, board[sq], EMPTY, 0);
@@ -459,7 +459,7 @@ int Board::getSqOfFirstPieceOnRay(int fromSq, int ray) {
 	return -1;
 }
 
-int Board::getCaptureMoves(Move *moves) {
+int Board::getCaptureMoves(int *moves) {
 	int movesInPosition = 0;
 	int newPos;
 
@@ -471,26 +471,26 @@ int Board::getCaptureMoves(Move *moves) {
 						int dirMod = (sideToMove == WHITE) ? 0 : 4;
 						if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod]) && boardColor[sq + pieceDeltas[PAWN][dirMod]] == (sideToMove*(-1))) {
 							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], board[sq + pieceDeltas[PAWN][dirMod]], MFLAGS_CPT);
+								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], board[sq + pieceDeltas[PAWN][dirMod]], 1);
 							}
 							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[sq + pieceDeltas[PAWN][dirMod]], MFLAGS_CPT + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[sq + pieceDeltas[PAWN][dirMod]], 1);
 							}
 						}
 						if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod + 2]) && boardColor[sq + pieceDeltas[PAWN][dirMod + 2]] == (sideToMove*(-1))) {
 							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], board[sq + pieceDeltas[PAWN][dirMod + 2]], MFLAGS_CPT);
+								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
 							}
 							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 2]], MFLAGS_CPT + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
 							}
 						}
 						if (enPassant != -1) {
 							if ((sq + pieceDeltas[PAWN][dirMod]) == enPassant) {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, MFLAGS_CPT + MFLAGS_ENP + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, 1);
 							}
 							else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, MFLAGS_CPT + MFLAGS_ENP + MFLAGS_PAWN_MOVE);
+								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, 1);
 							}
 						}
 					}
@@ -499,7 +499,7 @@ int Board::getCaptureMoves(Move *moves) {
 							newPos = sq + pieceDeltas[board[sq]][dir];
 							if (ON_BOARD(newPos)) {
 								if (boardColor[newPos] == sideToMove*(-1)) {
-									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], MFLAGS_CPT);
+									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
 								}
 							}
 						}
@@ -513,7 +513,7 @@ int Board::getCaptureMoves(Move *moves) {
 						while (((newPos += pieceDeltas[board[sq]][dir]) & 0x88) == 0) {
 							if (board[newPos] != EMPTY) {
 								if (boardColor[newPos] == sideToMove*(-1)) {
-									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], MFLAGS_CPT);
+									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
 								}
 								break;
 							}
@@ -527,16 +527,24 @@ int Board::getCaptureMoves(Move *moves) {
 	return movesInPosition;
 }
 
-inline void Board::moveAdd(int *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int capture, int enPassant, int promotion, Piece promotedTo, int castle) {
+inline int Board::addPromotionPermutations(int *moves, int moveNum, int sq, int tarSq, Piece attackedPiece, int capture) {
+	moveAdd(moves, moveNum, sq, tarSq, PAWN, attackedPiece, capture);
+	moves[moveNum++] |= (QUEEN << MOVE_PROMOTED_TO_SHIFT) | (1 << MOVE_PROMOTION_SHIFT);
+	moveAdd(moves, moveNum, sq, tarSq, PAWN, attackedPiece, capture);
+	moves[moveNum++] |= (ROOK << MOVE_PROMOTED_TO_SHIFT) | (1 << MOVE_PROMOTION_SHIFT);
+	moveAdd(moves, moveNum, sq, tarSq, PAWN, attackedPiece, capture);
+	moves[moveNum++] |= (BISHOP << MOVE_PROMOTED_TO_SHIFT) | (1 << MOVE_PROMOTION_SHIFT);
+	moveAdd(moves, moveNum, sq, tarSq, PAWN, attackedPiece, capture);
+	moves[moveNum++] |= (KNIGHT << MOVE_PROMOTED_TO_SHIFT) | (1 << MOVE_PROMOTION_SHIFT);
+	return moveNum;
+}
+
+inline void Board::moveAdd(int *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int capture) {
 	moves[moveNum] =	(squareFrom)							|
 						(squareTo << MOVE_TO_SQ_SHIFT)			|
 						(movedPiece << MOVE_MOVED_PIECE_SHIFT)	|
 						(attacked << MOVE_ATTACKED_PIECE_SHIFT)	|
-						(capture << MOVE_CAPTURE_SHIFT)			|
-						(enPassant << MOVE_EN_PASSANT_SHIFT)	|
-						(promotion << MOVE_PROMOTION_SHIFT)		|
-						(promotedTo << MOVE_PROMOTED_TO_SHIFT)  |
-						(castle << MOVE_CASTLE_LONG_SHIFT)
+						(capture << MOVE_CAPTURE_SHIFT)
 		;
 	//moves[moveNum] = Move{ static_cast<uint8_t>(squareFrom), static_cast<uint8_t>(squareTo), movedPiece, attacked, static_cast<uint16_t>(flags), static_cast<uint8_t>(moveNum) };
 }
@@ -545,7 +553,7 @@ void Board::moveMakeNull() {
 	sideToMove = Color(sideToMove*(-1));
 	zobristKey ^= zobrist.side;
 	halfMoveCount++;
-	history[++historyIndex] = State{ Move {128, 128, EMPTY, EMPTY, MFLAGS_NULL, NO_ID }, wCastlingRights, bCastlingRights, enPassant, halfMoveClk };
+	history[++historyIndex] = State{ -1, wCastlingRights, bCastlingRights, enPassant, halfMoveClk };
 	if (enPassant != -1) {
 		zobristKey ^= zobrist.enPassant[enPassant % 8];
 		enPassant = -1;
@@ -569,19 +577,24 @@ void Board::moveUnmakeNull() {
 void Board::moveMake(int move) { // TODO maybe consider writing captured piece here instead of in each move add if that is more efficient
 	history[++historyIndex] = State{ move, wCastlingRights, bCastlingRights, enPassant, halfMoveClk };
 	repStack[++repIndex] = zobristKey;
-	if (move.movedPiece == KING) {
-		if (boardColor[move.fromSq] == WHITE) {
-			wKingSq = move.toSq;
+
+	int fromSq = move & MOVE_FROM_SQ_MASK;
+	int toSq = ((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
+	Piece movedPiece = Piece((move & MOVE_MOVED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT);
+
+	if (movedPiece == KING) {
+		if (boardColor[fromSq] == WHITE) {
+			wKingSq = toSq;
 		}
 		else {
-			bKingSq = move.toSq;
+			bKingSq = toSq;
 		}
 	}
 	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
 	if (enPassant != -1) zobristKey ^= zobrist.enPassant[enPassant % 8];
 
-	switch (move.fromSq) {
+	switch (fromSq) {
 		case 0: wCastlingRights &= ~CASTLE_LONG; break;
 		case 4: wCastlingRights &= ~CASTLE_BOTH; break;
 		case 7: wCastlingRights &= ~CASTLE_SHORT; break;
@@ -589,7 +602,7 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 		case 116: bCastlingRights &= ~CASTLE_BOTH; break;
 		case 119: bCastlingRights &= ~CASTLE_SHORT; break;
 	} 
-	switch (move.toSq){
+	switch (toSq){
 		case 0: wCastlingRights &= ~CASTLE_LONG; break;
 		case 4: wCastlingRights &= ~CASTLE_BOTH; break;
 		case 7: wCastlingRights &= ~CASTLE_SHORT; break;
@@ -598,41 +611,38 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 		case 119: bCastlingRights &= ~CASTLE_SHORT; break;
 	}
 
-	if (move.flags & MFLAGS_CPT) {
+	if (move & MOVE_CAPTURE_MASK) {
 		halfMoveClk = -1;
-		materialTotal += (pieceValues[move.attackedPiece] * sideToMove);
-		clearSq(move.toSq);
-	}
-	else if (move.flags & MFLAGS_PAWN_MOVE) { // possible bug source, have else if since at the moment they do the same
-		halfMoveClk = -1;
+		materialTotal += (pieceValues[((move & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT)] * sideToMove);
+		clearSq(toSq);
 	}
 
-	if (move.flags & MFLAGS_PROMOTION) {
-		if (move.flags & MFLAGS_PROMOTION_QUEEN) {
+	if (move & MOVE_PROMOTION_MASK) {
+		if (((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == QUEEN) {
 			materialTotal += (pieceValues[QUEEN] - pieceValues[PAWN])*sideToMove;
-			clearSq(move.fromSq);
-			setSq(move.fromSq, QUEEN, sideToMove);
+			clearSq(fromSq);
+			setSq(fromSq, QUEEN, sideToMove);
 		}
-		else if (move.flags & MFLAGS_PROMOTION_ROOK) {
+		else if (((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == ROOK) {
 			materialTotal += (pieceValues[ROOK] - pieceValues[PAWN])*sideToMove;
-			clearSq(move.fromSq);
-			setSq(move.fromSq, ROOK, sideToMove);
+			clearSq(fromSq);
+			setSq(fromSq, ROOK, sideToMove);
 		}
-		else if (move.flags & MFLAGS_PROMOTION_BISHOP) {
+		else if (((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == BISHOP) {
 			materialTotal += (pieceValues[BISHOP] - pieceValues[PAWN])*sideToMove;
-			clearSq(move.fromSq);
-			setSq(move.fromSq, BISHOP, sideToMove);
+			clearSq(fromSq);
+			setSq(fromSq, BISHOP, sideToMove);
 		}
-		else if (move.flags & MFLAGS_PROMOTION_KNIGHT) {
+		else if (((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == KNIGHT) {
 			materialTotal += (pieceValues[KNIGHT] - pieceValues[PAWN])*sideToMove;
-			clearSq(move.fromSq);
-			setSq(move.fromSq, KNIGHT, sideToMove);
+			clearSq(fromSq);
+			setSq(fromSq, KNIGHT, sideToMove);
 		}
 	}
 
-	else if (move.flags & MFLAGS_CASTLE_LONG) {
-		setSq(move.toSq + EAST, ROOK, sideToMove);
-		clearSq(move.toSq + WEST * 2);
+	else if (move & MOVE_CASTLE_LONG_MASK) {
+		setSq(toSq + EAST, ROOK, sideToMove);
+		clearSq(toSq + WEST * 2);
 
 		if (sideToMove == WHITE) {
 			wCastlingRights = 0;
@@ -641,9 +651,9 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 			bCastlingRights = 0;
 		}
 	}
-	else if (move.flags & MFLAGS_CASTLE_SHORT) {
-		setSq(move.toSq + WEST, ROOK, sideToMove);
-		clearSq(move.toSq + EAST);
+	else if (move & MOVE_CASTLE_SHORT_MASK) {
+		setSq(toSq + WEST, ROOK, sideToMove);
+		clearSq(toSq + EAST);
 
 		if (sideToMove == WHITE) {
 			wCastlingRights = 0;
@@ -653,21 +663,26 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 		}
 	}
 
-	setSq(move.toSq, board[move.fromSq], boardColor[move.fromSq]);
-	clearSq(move.fromSq);
+	setSq(toSq, board[fromSq], boardColor[fromSq]);
+	clearSq(fromSq);
 
-	if (move.flags & MFLAGS_ENP) {
-		if ((move.toSq % 8) - (move.fromSq % 8) == WEST) {
-			clearSq(move.fromSq + WEST);
+	if (move & MOVE_EN_PASSANT_MASK) {
+		if ((toSq % 8) - (fromSq % 8) == WEST) {
+			clearSq(fromSq + WEST);
 		}
 		else {
-			clearSq(move.fromSq + EAST);
+			clearSq(fromSq + EAST);
 		}
 	}
-
-	if (move.flags & MFLAGS_PAWN_DOUBLE) {
-		enPassant = (move.fromSq + move.toSq) / 2;
-		zobristKey ^= zobrist.enPassant[enPassant % 8];
+	if (movedPiece == PAWN) {
+		halfMoveClk = -1;
+		if (abs(toSq - fromSq) == NN) { // pawn double move
+			enPassant = (fromSq + toSq) / 2;
+			zobristKey ^= zobrist.enPassant[enPassant % 8];
+		}
+		else if (enPassant != -1) {
+			enPassant = -1;
+		}
 	} else if (enPassant != -1) {
 		enPassant = -1;
 	}
@@ -678,9 +693,6 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 	zobristKey ^= zobrist.side;
 	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
-	//if (zobristKey != getZobristKey()) {
-	//	move.flags = 0;
-	//}
 }
 
 unsigned long long Board::getZobristKey() {
@@ -705,60 +717,66 @@ unsigned long long Board::getZobristKey() {
 
 void Board::moveUnmake() {
 	State prevState = history[historyIndex--];
+
+	int fromSq = prevState.move & MOVE_FROM_SQ_MASK;
+	int toSq = ((prevState.move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
+	Piece movedPiece = Piece((prevState.move & MOVE_MOVED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT);
+	Piece attackedPiece = Piece((prevState.move & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT);
+
 	sideToMove = Color(sideToMove*(-1));
 	zobristKey ^= zobrist.side;
 	if (enPassant != -1) zobristKey ^= zobrist.enPassant[enPassant % 8];
 	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
 
-	if (prevState.move.movedPiece == KING) {
-		if (boardColor[prevState.move.toSq] == WHITE) {
-			wKingSq = prevState.move.fromSq;
+	if (movedPiece == KING) {
+		if (boardColor[toSq] == WHITE) {
+			wKingSq = fromSq;
 		}
 		else {
-			bKingSq = prevState.move.fromSq;
+			bKingSq = fromSq;
 		}
-		if (prevState.move.flags & MFLAGS_CASTLE_LONG) {
-			setSq(prevState.move.toSq + 2 * WEST, ROOK, sideToMove);
-			clearSq(prevState.move.toSq + EAST);
+		if (prevState.move & MOVE_CASTLE_LONG_MASK) {
+			setSq(toSq + 2 * WEST, ROOK, sideToMove);
+			clearSq(toSq + EAST);
 		}
-		else if (prevState.move.flags & MFLAGS_CASTLE_SHORT) {
-			setSq(prevState.move.toSq + EAST, ROOK, sideToMove);
-			clearSq(prevState.move.toSq + WEST);
+		else if (prevState.move & MOVE_CASTLE_SHORT_MASK) {
+			setSq(toSq + EAST, ROOK, sideToMove);
+			clearSq(toSq + WEST);
 		}
 	}
-	if (prevState.move.flags & MFLAGS_PROMOTION) {
-		if (prevState.move.flags & MFLAGS_PROMOTION_QUEEN) {
+	if (prevState.move & MOVE_PROMOTION_MASK) {
+		if (((prevState.move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == QUEEN) {
 			materialTotal -= (pieceValues[QUEEN] - pieceValues[PAWN])*sideToMove;
 		}
-		else if (prevState.move.flags & MFLAGS_PROMOTION_ROOK) {
+		else if (((prevState.move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == ROOK) {
 			materialTotal -= (pieceValues[ROOK] - pieceValues[PAWN])*sideToMove;
 		}
-		else if (prevState.move.flags & MFLAGS_PROMOTION_BISHOP) {
+		else if (((prevState.move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == BISHOP) {
 			materialTotal -= (pieceValues[BISHOP] - pieceValues[PAWN])*sideToMove;
 		}
-		else if (prevState.move.flags & MFLAGS_PROMOTION_KNIGHT) {
+		else if (((prevState.move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == KNIGHT) {
 			materialTotal -= (pieceValues[KNIGHT] - pieceValues[PAWN])*sideToMove;
 		}
 	}
-	clearSq(prevState.move.toSq); // must clear first to remove position value of piece
-	if (prevState.move.flags & MFLAGS_CPT) {
-		materialTotal -= (pieceValues[prevState.move.attackedPiece] * sideToMove);
-		if (prevState.move.flags & MFLAGS_ENP) {
-			if ((prevState.move.toSq % 8) - (prevState.move.fromSq % 8) == WEST) {
-				setSq(prevState.move.fromSq + WEST, PAWN, Color(sideToMove*(-1)));
+	clearSq(toSq); // must clear first to remove position value of piece
+	if (prevState.move & MOVE_CAPTURE_MASK) {
+		materialTotal -= (pieceValues[attackedPiece] * sideToMove);
+		if (prevState.move & MOVE_EN_PASSANT_MASK) {
+			if ((toSq % 8) - (fromSq % 8) == WEST) {
+				setSq(fromSq + WEST, PAWN, Color(sideToMove*(-1)));
 			}
 			else {
-				setSq(prevState.move.fromSq + EAST, PAWN, Color(sideToMove*(-1)));
+				setSq(fromSq + EAST, PAWN, Color(sideToMove*(-1)));
 			}
-			clearSq(prevState.move.toSq);
+			clearSq(toSq);
 		}
 		else {
-			setSq(prevState.move.toSq, prevState.move.attackedPiece, Color(sideToMove*(-1)));
+			setSq(toSq, attackedPiece, Color(sideToMove*(-1)));
 		}
 	}
 
-	setSq(prevState.move.fromSq, prevState.move.movedPiece, sideToMove);
+	setSq(fromSq, movedPiece, sideToMove);
 
 	wCastlingRights = prevState.wCastleRights;
 	bCastlingRights = prevState.bCastleRights;
@@ -1223,20 +1241,19 @@ int Board::getSqAttackers(int *attackingSquares, int chkdSq, Color attackColor) 
 	return numOfAttackers;
 }
 
-void Board::printMoves(Move *moves, int numOfMoves) {
+void Board::printMoves(int *moves, int numOfMoves) {
 	std::cout << "Number of moves: " << numOfMoves << std::endl;
 	for (int i = 0; i < numOfMoves; i++) {
-		std::cout << std::to_string(i) << ".\t" << char((moves[i].fromSq % 8) + 97) << (moves[i].fromSq >> 4) + 1 << " " << char((moves[i].toSq % 8) + 97) << (moves[i].toSq >> 4) + 1;
-		std::cout << " id: " << int(moves[i].id);
-		if (moves[i].flags & MFLAGS_CPT) {
+		std::cout << std::to_string(i) << ".\t" << char(((moves[i] & MOVE_FROM_SQ_MASK) % 8) + 97) << ((moves[i] & MOVE_FROM_SQ_MASK) >> 4) + 1 << " " << char(((moves[i] & MOVE_TO_SQ_MASK) % 8) + 97) << ((moves[i] & MOVE_TO_SQ_MASK) >> 4) + 1;
+		if (moves[i] & MOVE_CAPTURE_MASK) {
 			std::cout << "\tCapture";
-		} if (moves[i].flags & MFLAGS_CASTLE_LONG) {
+		} if (moves[i] & MOVE_CASTLE_LONG_MASK) {
 			std::cout << "\tCastle long";
-		} if (moves[i].flags & MFLAGS_CASTLE_SHORT) {
+		} if (moves[i] & MOVE_CASTLE_SHORT_MASK) {
 			std::cout << "\tCastle short";
-		} if (moves[i].flags & MFLAGS_ENP) {
+		} if (moves[i] & MOVE_EN_PASSANT_MASK) {
 			std::cout << "\tEn Passant";
-		} if (moves[i].flags & MFLAGS_PROMOTION) {
+		} if (moves[i] & MOVE_PROMOTION_MASK) {
 			std::cout << "\tPromotion";
 		}
 		std::cout << std::endl;

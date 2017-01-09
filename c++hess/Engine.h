@@ -12,8 +12,8 @@ class Com;
 class Engine {
 	public:
 		Engine(int _sideToPlay, int _depth, std::string fen = "", bool console = false);
-		void sortMoves(Move *moves, int numOfMoves, int bestMoveId, int ply);
-		int findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int beta, uint8_t *bestMoveId);
+		void sortMoves(int *moves, int numOfMoves, int bestMoveId, int ply);
+		int findBestMove(int *moves, int numOfMoves, int depth, int alpha, int beta, int *moveToMake);
 		int miniMax(int depthLeft);
 		int alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNull, bool isPV);
 		bool isRepetition();
@@ -21,10 +21,10 @@ class Engine {
 		int quiescence(int alpha, int beta);
 		int evaluatePosition();
 		Board board;
-		void mvvLva(Move *moves, int numOfMoves);
+		void mvvLva(int *moves, int numOfMoves);
 		int sideToPlay;
 		unsigned long long perft(int depth);
-		int iterativeDeepening(Move *moves, int numOfMoves);
+		int iterativeDeepening(int *moves, int numOfMoves);
 		Transposition tTable;
 		void infoPV(int searchLength, int score);
 		void comInit();
@@ -34,8 +34,8 @@ class Engine {
 		void comSend(std::string command);
 		int historyMoves[120][120];
 		void decHistoryTable();
-		Move killers[50][2];
-		void setKillers(Move move, int ply);
+		int killers[50][2];
+		void setKillers(int move, int ply);
 		void infoNPS(unsigned long long nodes, unsigned long startTime);
 		void getSearchStats(int searchDepth, unsigned long long prevNodeCount, unsigned long startTime);
 		int SEE(int sq);

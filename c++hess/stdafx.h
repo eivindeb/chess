@@ -399,7 +399,7 @@ struct Move {
 };
 
 struct State {
-	Move move;
+	int move;
 	int wCastleRights;
 	int bCastleRights;
 	int enPassant;
@@ -416,7 +416,7 @@ struct Zobrist {
 
 struct TranspositionEntry {
 	unsigned long long zobristKey;
-	Move bestMove;
+	int bestMove;
 	int score;
 	uint8_t depth;
 	uint8_t age;
@@ -457,10 +457,11 @@ struct TranspositionEntry {
 	capture			(20 bit)
 	en passant		(21 bit)
 	promotion		(22 bit)
-	promoted to		(23-25 bit)
-	castle long		(26 bit)
-	castle short	(27 bit)
-	null move
+	promoted to		(23-24 bit)
+	castle long		(25 bit)
+	castle short	(26 bit)
+	id				(27-31 bit) // TODO, have now changed promoted to, to just 2 bits, so have to change that in all calls and checks. Also have to add id to move add.
+									(thinking a counter for reset each square in move gen)
 
 */
 

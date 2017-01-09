@@ -16,6 +16,8 @@
 #define KILLER_ORDER	1000
 #define SEE_ORDER_DEPTH	0
 
+#define EMPTY_MOVE		-1
+
 #define DRAW_OPENING	-10
 #define DRAW_ENDGAME	0
 #define ENDGAME_MAT		pieceValues[KING] + pieceValues[PAWN] * 4
@@ -64,8 +66,8 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 	if (inCheck) depthLeft++; // in check extension
 	if (depthLeft == 0) return quiescence(alpha, beta);
 
-	Move moves[218];
-	Move ttMove = Move{ (uint8_t)0, (uint8_t)0, EMPTY, EMPTY, 0, (uint8_t)NO_ID };
+	int moves[218];
+	int ttMove = EMPTY_MOVE;
 	int score = 0;
 	int bestMoveIndex = 0;
 	int ttVal = 0;
@@ -105,7 +107,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 	}
 	else numOfMoves = board.getLegalMoves(moves);
 
-	sortMoves(moves, numOfMoves, ttMove.id, ply);
+	sortMoves(moves, numOfMoves, ttMove, ply);
 
 	if (!(nodeCount & 4000) && (timer.timesUp || stopSearch)) {
 		return 0;
@@ -121,7 +123,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 		}
 		newDepth = depthLeft - 1;
 
-		if (i >= 4 && !isPV && depthLeft >= 3 && !(moves[i].flags & MFLAGS_CPT) && !(moves[i].flags & MFLAGS_PROMOTION) && !(board.inCheck(board.sideToMove))) {
+		if (i >= 4 && !isPV && depthLeft >= 3 && !(moves[i] & MOVE_CAPTURE_MASK) && !(moves[i] & MOVE_PROMOTION_MASK) && !(board.inCheck(board.sideToMove))) {
 			newDepth--;
 		}
 
@@ -142,9 +144,9 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 		board.moveUnmake();
 		if (score > alpha) {
 			if (score >= beta) {
-				if (!(moves[i].flags & MFLAGS_CPT)  && !(moves[i].flags & MFLAGS_PROMOTION)) {
+				if (!(moves[i] & MOVE_CAPTURE_MASK)  && !(moves[i] & MOVE_PROMOTION_MASK)) {
 					setKillers(moves[i], ply);
-					historyMoves[moves[i].fromSq][moves[i].toSq] += depthLeft*depthLeft;
+					historyMoves[moves[i] & MOVE_FROM_SQ_MASK][(moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT] += depthLeft*depthLeft;
 				}
 				tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount, beta, TT_BETA, moves[i]);
 				return beta;
@@ -171,12 +173,12 @@ int Engine::quiescence(int alpha, int beta) {
 	}
 
 	//TODO might have to check for in check here??
-	Move moves[218];
+	int moves[218];
 	int score = 0;
 	int numOfCaptures = board.getCaptureMoves(moves);
 	mvvLva(moves, numOfCaptures);
 	for (int i = 0; i < numOfCaptures; i++) {
-		if (!(board.phaseFlag & PHASE_EG) && !(moves[i].flags & MFLAGS_PROMOTION) && standPat + pieceValues[moves[i].attackedPiece] + 200 < alpha) { // delta pruning
+		if (!(board.phaseFlag & PHASE_EG) && !(moves[i] & MOVE_PROMOTION_MASK) && standPat + pieceValues[(moves[i] & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] + 200 < alpha) { // delta pruning
 			continue;
 		}
 		//if (SEE(moves[i].toSq) < 0) {
@@ -210,7 +212,7 @@ unsigned long long Engine::perft(int depthLeft) {
 	int materialBefore = 0;
 	int posTotBefore = 0;
 
-	Move moves[218];
+	int moves[218];
 	int numOfMoves = 0;
 	if (board.inCheck(board.sideToMove)) {
 		numOfMoves = board.getLegalMovesInCheck(moves);
@@ -235,7 +237,7 @@ unsigned long long Engine::perft(int depthLeft) {
 		if (!board.inCheck(Color(board.sideToMove*(-1)))) {
 			nodes += perft(depthLeft - 1);
 			if (maxDepth == depthLeft) {
-				std::cout << SQ_FILE(moves[i].fromSq) << SQ_RANK(moves[i].fromSq) << " " << SQ_FILE(moves[i].toSq) << SQ_RANK(moves[i].toSq) << "\t" << nodes - nodesLast << std::endl;
+				std::cout << SQ_FILE(moves[i] & MOVE_FROM_SQ_MASK) << SQ_RANK(moves[i] & MOVE_FROM_SQ_MASK) << " " << SQ_FILE((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << SQ_RANK((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << "\t" << nodes - nodesLast << std::endl;
 				nodesLast = nodes;
 			}
 		}
@@ -257,7 +259,7 @@ int Engine::miniMax(int depthLeft) {
 	int score;
 	int scoreMax = -20000;
 
-	Move moves[218];
+	int moves[218];
 	int numOfMoves = 0;
 	if (board.inCheck(board.sideToMove)) {
 		numOfMoves = board.getLegalMovesInCheck(moves);
@@ -281,7 +283,7 @@ int Engine::miniMax(int depthLeft) {
 			for (int j = depthLeft; j < 3; j++) {
 				std::cout << "\t";
 			}
-			std::cout << SQ_FILE(moves[i].fromSq) << SQ_RANK(moves[i].fromSq) << " " << SQ_FILE(moves[i].toSq) << SQ_RANK(moves[i].toSq) << "\t" << score << std::endl;
+			std::cout << SQ_FILE(moves[i] & MOVE_FROM_SQ_MASK) << SQ_RANK(moves[i] & MOVE_FROM_SQ_MASK) << " " << SQ_FILE((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << SQ_RANK((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << "\t" << score << std::endl;
 		}
 		if (score > scoreMax) {
 			scoreMax = score;
@@ -292,13 +294,13 @@ int Engine::miniMax(int depthLeft) {
 	return scoreMax;
 }
 
-inline void Engine::mvvLva(Move *moves, int numOfMoves) {
-	std::sort(moves, moves + numOfMoves, [](Move &lhs, Move &rhs) {	return pieceSorting[lhs.attackedPiece] > pieceSorting[rhs.attackedPiece] ||
-																		(pieceSorting[lhs.attackedPiece] == pieceSorting[rhs.attackedPiece] && pieceSorting[lhs.movedPiece] < pieceSorting[rhs.movedPiece]); });
+inline void Engine::mvvLva(int *moves, int numOfMoves) {
+	std::sort(moves, moves + numOfMoves, [](int &lhs, int &rhs) {	return pieceSorting[(lhs & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] > pieceSorting[(rhs & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] ||
+																		(pieceSorting[(lhs & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] == pieceSorting[(rhs & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] && pieceSorting[((lhs & MOVE_MOVED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT)] < pieceSorting[((rhs & MOVE_MOVED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT)]); });
 }
 
 int Engine::evaluatePosition() {
-	Move moves[218];
+	int moves[218];
 	int wNumOfMoves;
 	int bNumOfMoves;
 	if (board.sideToMove == WHITE) {
@@ -323,21 +325,20 @@ int Engine::evaluatePosition() {
 	return (score) * board.sideToMove;
 }
 
-int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int beta, uint8_t *bestMoveId) {
+int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int beta, int *moveToMake) {
 	int score = -20000;
-	int bestId = 0;
 	int bestIndex = 0;
 	nodeCount++;
-	Move ttMove = Move{ (uint8_t)0, (uint8_t)0, EMPTY, EMPTY, 0, (uint8_t) NO_ID };
+	int ttMove = -1;
 	if (board.inCheck(board.sideToMove)) { // check extension
 		depth++;
 	}
 	tTable.probe(board.zobristKey, depth, alpha, beta, &ttMove);
-	sortMoves(moves, numOfMoves, ttMove.id, 0);
+	sortMoves(moves, numOfMoves, ttMove, 0);
 	for (int i = 0; i < numOfMoves; i++) {
 		if (timer.timesUp == true || stopSearch) {
-			*bestMoveId = NO_ID;
-			return 0;
+			*moveToMake = -1;
+			return EMPTY_MOVE;
 		}
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) { // move that puts its own king in check
@@ -352,7 +353,7 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 		board.moveUnmake();
 		if (score > alpha) {
 			alpha = score;
-			*bestMoveId = moves[i].id;
+			*moveToMake = moves[i];
 			bestIndex = i;
 			if (score >= beta) {
 				tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, beta, TT_BETA, moves[bestIndex]);
@@ -367,52 +368,52 @@ int Engine::findBestMove(Move *moves, int numOfMoves, int depth, int alpha, int 
 	return alpha;
 }
 
-inline void Engine::sortMoves(Move *moves, int numOfMoves, int bestMoveId, int ply) {
+inline void Engine::sortMoves(int *moves, int numOfMoves, int bestMove, int ply) {
 	int orderingValues[218] = { 0 };
 	for (int i = 0; i < numOfMoves; i++) {
-		if (bestMoveId != 0 && bestMoveId != NO_ID && moves[i].id == bestMoveId) {
+		if (bestMove != EMPTY_MOVE && moves[i] == bestMove) {
 			orderingValues[moves[i].id] += HASH_ORDER;
 			continue;
 		}
-		if (moves[i].flags & MFLAGS_CPT || moves[i].flags & MFLAGS_PROMOTION) {
-			if (moves[i].flags & MFLAGS_CPT) {
+		if (moves[i] & MOVE_CAPTURE_MASK || moves[i] & MOVE_PROMOTION_MASK) {
+			if (moves[i] & MOVE_CAPTURE_MASK) {
 				if (ply <= SEE_ORDER_DEPTH) {
-					orderingValues[moves[i].id] += SEE(moves[i].toSq);
+					orderingValues[moves[i].id] += SEE((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
 					orderingValues[moves[i].id] += (orderingValues[moves[i].id] > 0) ? CPT_ORDER : 0;
 				}
 				else {
-					orderingValues[moves[i].id] += (pieceValues[moves[i].attackedPiece] - pieceValues[moves[i].movedPiece]) + CPT_ORDER;
+					orderingValues[moves[i].id] += (pieceValues[(moves[i] & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] - pieceValues[(moves[i] & MOVE_MOVED_PIECE_MASK) >> MOVE_MOVED_PIECE_SHIFT]) + CPT_ORDER;
 				}
 			}
 			else {
-				if (moves[i].flags & MFLAGS_PROMOTION_QUEEN) {
+				if (((moves[i] & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == QUEEN) {
 					orderingValues[moves[i].id] += (pieceValues[QUEEN] - pieceValues[PAWN]) + PROMOTION_ORDER;
 				}
-				else if (moves[i].flags & MFLAGS_PROMOTION_ROOK) {
+				else if (((moves[i] & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == ROOK) {
 					orderingValues[moves[i].id] += (pieceValues[ROOK] - pieceValues[PAWN]) + PROMOTION_ORDER;
 				}
-				else if (moves[i].flags & MFLAGS_PROMOTION_BISHOP) {
+				else if (((moves[i] & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == BISHOP) {
 					orderingValues[moves[i].id] += (pieceValues[BISHOP] - pieceValues[PAWN]) + PROMOTION_ORDER;
 				}
 				else orderingValues[moves[i].id] += (pieceValues[KNIGHT] - pieceValues[PAWN]) + PROMOTION_ORDER;
 			}
 		}
 		else {
-			if (moves[i].fromSq == killers[ply][KILLER_PRIMARY].fromSq && moves[i].toSq == killers[ply][KILLER_PRIMARY].toSq) {
+			if (moves[i] == killers[ply][KILLER_PRIMARY]) {
 				orderingValues[moves[i].id] += KILLER_ORDER;
 			}
-			else if (moves[i].fromSq == killers[ply][KILLER_SECONDARY].fromSq && moves[i].toSq == killers[ply][KILLER_SECONDARY].toSq) {
+			else if (moves[i] == killers[ply][KILLER_SECONDARY]) {
 				orderingValues[moves[i].id] += KILLER_ORDER - 1;
 			}
 			else {
-				orderingValues[moves[i].id] += historyMoves[moves[i].fromSq][moves[i].toSq];
+				orderingValues[moves[i].id] += historyMoves[moves[i] & MOVE_FROM_SQ_MASK][(moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT];
 			}
 		}
 	}
 	std::sort(moves, moves + numOfMoves, [&orderingValues](Move lhs, Move rhs) {return orderingValues[lhs.id] > orderingValues[rhs.id]; });
 }
 
-int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
+int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 	int score;
 	Color findMoveFor = board.sideToMove;
 
@@ -426,11 +427,11 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 	}
 	
 	int windowMissCount = 0;
-	uint8_t newBest = 0;
-	uint8_t bestId = 0;
+	int newBest = 0;
+	int bestMove = 0;
 	int alpha = -200000;
 	int beta = 200000;
-	Move pvMove;
+	int pvMove;
 	stopSearch = false;
 	nodeCount = 0;
 	unsigned long searchLength = calculateTimeForMove(findMoveFor);
@@ -467,7 +468,7 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 		infoNPS(nodeCount - lastNodeCount, searchStart);
 		infoPV(currDepth, INVALID);
 		getSearchStats(currDepth, lastNodeCount, searchStart);
-		bestId = newBest;
+		bestMove = newBest;
 		if (wmsLeft != -1 && (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE > searchLength - timer.mseconds) { // next depth would take longer than remaining time
 			std::cout << "Ended search early as next depth would take " << (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE << " ms and we have " << searchLength - timer.mseconds << " ms remaining" << std::endl;
 			timer.stop();
@@ -478,7 +479,7 @@ int Engine::iterativeDeepening(Move *moves, int numOfMoves) {
 	infoNPS(nodeCount, 0);
 	getSearchStats(-1, 0, 0);
 
-	return bestId;
+	return bestMove;
 }
 
 int Engine::SEE(int sq) { // TODO, can check for only legal moves, but this will slow down and might not be necessary as SEE is only used as a guideline
@@ -629,7 +630,7 @@ inline void Engine::infoNPS(unsigned long long nodes, unsigned long startTime) {
 void Engine::infoPV(int searchDepth, int score) {
 	int pvLength = 0;
 	TT_FLAG lastMoveFlag;
-	Move pvMove;
+	int pvMove;
 	std::string pvString;
 	std::stringstream pvSS;
 	switch (mode) {
@@ -641,7 +642,7 @@ void Engine::infoPV(int searchDepth, int score) {
 		if (!(lastMoveFlag = tTable.getPV(board.zobristKey, &pvMove))) {
 			break;
 		}
-		pvSS << SQ_FILE(pvMove.fromSq) << SQ_RANK(pvMove.fromSq) << SQ_FILE(pvMove.toSq) << SQ_RANK(pvMove.toSq) << " ";
+		pvSS << SQ_FILE(pvMove & MOVE_FROM_SQ_MASK) << SQ_RANK(pvMove & MOVE_FROM_SQ_MASK) << SQ_FILE((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << SQ_RANK((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << " ";
 		board.moveMake(pvMove);
 		pvLength++;
 		//if (lastMoveFlag != TT_EXACT) {
@@ -687,8 +688,8 @@ inline void Engine::decHistoryTable() {
 	}
 }
 
-inline void Engine::setKillers(Move move, int ply) {
-	if (move.toSq != killers[ply][KILLER_PRIMARY].toSq || move.fromSq != killers[ply][KILLER_PRIMARY].fromSq) {
+inline void Engine::setKillers(int move, int ply) {
+	if (move != killers[ply][KILLER_PRIMARY]) {
 		killers[ply][KILLER_SECONDARY] = killers[ply][KILLER_PRIMARY];
 		killers[ply][KILLER_PRIMARY] = move;
 	}
@@ -782,24 +783,24 @@ int Engine::comUCI(std::string command) {
 				board.loadFromFen(START_FEN);
 			}
 			else {
-				std::string move = tokens.back();
-				std::string moveFrom = move.substr(0, 2);
-				std::string moveTo = move.substr(2);
-				uint16_t flags = 0;
+				std::string moveString = tokens.back();
+				std::string moveFrom = moveString.substr(0, 2);
+				std::string moveTo = moveString.substr(2);
+				int move = 0;
 				if (moveTo.length() == 3) { //promotion
-					flags += MFLAGS_PROMOTION;
+					move |= (1 << MOVE_PROMOTION_SHIFT);
 					switch (moveTo.back()) {
 					case 'q':
-						flags += MFLAGS_PROMOTION_QUEEN;
+						move |= (QUEEN << MOVE_PROMOTED_TO_SHIFT);
 						break;
 					case 'r':
-						flags += MFLAGS_PROMOTION_ROOK;
+						move |= (ROOK << MOVE_PROMOTED_TO_SHIFT);
 						break;
 					case 'b':
-						flags += MFLAGS_PROMOTION_BISHOP;
+						move |= (BISHOP << MOVE_PROMOTED_TO_SHIFT);
 						break;
 					case 'k':
-						flags += MFLAGS_PROMOTION_KNIGHT;
+						move |= (KNIGHT << MOVE_PROMOTED_TO_SHIFT);
 						break;
 					default:
 						comSend("Unexpected third parameter in moveTo, was:");
@@ -807,31 +808,27 @@ int Engine::comUCI(std::string command) {
 						break;
 					}
 				}
-				uint8_t sqFrom = SQ_STR_TO_INT(moveFrom);
-				uint8_t sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
 				
-				if (sqFrom == board.history[board.historyIndex].move.fromSq && sqTo == board.history[board.historyIndex].move.toSq) {
+				int sqFrom = SQ_STR_TO_INT(moveFrom);
+				int sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
+				
+				if (sqFrom == (board.history[board.historyIndex].move & MOVE_FROM_SQ_MASK)  && sqTo == ((board.history[board.historyIndex].move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) {
 					return 0; // the move the engine did so we ignore it
 				}
 
-				if (board.board[sqTo] != EMPTY) flags += MFLAGS_CPT;
-				if (sqTo == board.enPassant) flags += MFLAGS_ENP;
-				if (board.board[sqFrom] == PAWN) {
-					flags += MFLAGS_PAWN_MOVE;
-					if (abs(sqTo - sqFrom) == 32) flags += MFLAGS_PAWN_DOUBLE;
-				}
+				if (board.board[sqTo] != EMPTY) move |= (1 << MOVE_CAPTURE_SHIFT);
+				if (sqTo == board.enPassant) move |= (1 << MOVE_EN_PASSANT_SHIFT);
 
 				if (board.board[sqFrom] == KING && abs(sqFrom - sqTo) == 2) {
 					if (sqFrom > sqTo) {
-						flags += MFLAGS_CASTLE_LONG;
+						move |= (1 << MOVE_CASTLE_LONG_SHIFT);
 					}
 					else {
-						flags += MFLAGS_CASTLE_SHORT;
+						move |= (1 << MOVE_CASTLE_SHORT_SHIFT);
 					}
 				}
 
-				Move moveObject = { sqFrom, sqTo, board.board[sqFrom], board.board[sqTo], flags, NO_ID };
-				board.moveMake(moveObject);
+				board.moveMake(move);
 			}
 		}
 		else if (tokens[0] == "go") {
@@ -860,9 +857,9 @@ int Engine::comUCI(std::string command) {
 					}
 				}
 			}
-			Move moves[218];
+			int moves[218];
 			int numOfMoves;
-			int index;
+			int move;
 			std::stringstream moveStream;
 			if (board.inCheck(board.sideToMove)) {
 				numOfMoves = board.getLegalMovesInCheck(moves);
@@ -870,16 +867,11 @@ int Engine::comUCI(std::string command) {
 			else {
 				numOfMoves = board.getLegalMoves(moves);
 			}
-			index = iterativeDeepening(moves, numOfMoves);
-			for (int i = 0; i < numOfMoves; i++) {
-				if (moves[i].id == index) {
-					index = i;
-					break;
-				}
-			}
-			moveStream << "bestmove " << SQ_FILE(moves[index].fromSq) << SQ_RANK(moves[index].fromSq) << SQ_FILE(moves[index].toSq) << SQ_RANK(moves[index].toSq);
+			move = iterativeDeepening(moves, numOfMoves);
+
+			moveStream << "bestmove " << SQ_FILE(move & MOVE_FROM_SQ_MASK) << SQ_RANK(move & MOVE_FROM_SQ_MASK) << SQ_FILE((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << SQ_RANK((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
 			comSend(moveStream.str());
-			board.moveMake(moves[index]);
+			board.moveMake(move);
 		}
 	}
 
