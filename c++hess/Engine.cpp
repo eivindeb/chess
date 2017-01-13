@@ -237,7 +237,17 @@ unsigned long long Engine::perft(int depthLeft) {
 		if (!board.inCheck(Color(board.sideToMove*(-1)))) {
 			nodes += perft(depthLeft - 1);
 			if (maxDepth == depthLeft) {
-				std::cout << SQ_FILE(moves[i] & MOVE_FROM_SQ_MASK) << SQ_RANK(moves[i] & MOVE_FROM_SQ_MASK) << " " << SQ_FILE((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << SQ_RANK((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << "\t" << nodes - nodesLast << std::endl;
+			/*for (int j = depthLeft; j < maxDepth; j++) {
+				std::cout << "\t";
+			}
+			std::cout << SQ_FILE((moves[i] & MOVE_FROM_SQ_MASK)) << SQ_RANK((moves[i] & MOVE_FROM_SQ_MASK)) << SQ_FILE(((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << "\t";
+			if (depthLeft != 1) {
+				std::cout << nodes - nodesLast << std::endl;
+			}
+			else {
+				std::cout << std::endl;
+			}*/
+				std::cout << SQ_FILE((moves[i] & MOVE_FROM_SQ_MASK)) << SQ_RANK((moves[i] & MOVE_FROM_SQ_MASK)) << SQ_FILE(((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << "\t" << nodes - nodesLast << std::endl;
 				nodesLast = nodes;
 			}
 		}
@@ -337,8 +347,8 @@ int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int b
 	sortMoves(moves, numOfMoves, ttMove, 0);
 	for (int i = 0; i < numOfMoves; i++) {
 		if (timer.timesUp == true || stopSearch) {
-			*moveToMake = -1;
-			return EMPTY_MOVE;
+			*moveToMake = EMPTY_MOVE;
+			return INVALID;
 		}
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) { // move that puts its own king in check
@@ -372,45 +382,101 @@ inline void Engine::sortMoves(int *moves, int numOfMoves, int bestMove, int ply)
 	int orderingValues[218] = { 0 };
 	for (int i = 0; i < numOfMoves; i++) {
 		if (bestMove != EMPTY_MOVE && moves[i] == bestMove) {
-			orderingValues[moves[i].id] += HASH_ORDER;
+			orderingValues[i] += HASH_ORDER;
 			continue;
 		}
 		if (moves[i] & MOVE_CAPTURE_MASK || moves[i] & MOVE_PROMOTION_MASK) {
 			if (moves[i] & MOVE_CAPTURE_MASK) {
 				if (ply <= SEE_ORDER_DEPTH) {
-					orderingValues[moves[i].id] += SEE((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
-					orderingValues[moves[i].id] += (orderingValues[moves[i].id] > 0) ? CPT_ORDER : 0;
+					orderingValues[i] += SEE((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
+					orderingValues[i] += (orderingValues[i] > 0) ? CPT_ORDER : 0;
 				}
 				else {
-					orderingValues[moves[i].id] += (pieceValues[(moves[i] & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] - pieceValues[(moves[i] & MOVE_MOVED_PIECE_MASK) >> MOVE_MOVED_PIECE_SHIFT]) + CPT_ORDER;
+					orderingValues[i] += (pieceValues[(moves[i] & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] - pieceValues[(moves[i] & MOVE_MOVED_PIECE_MASK) >> MOVE_MOVED_PIECE_SHIFT]) + CPT_ORDER;
 				}
 			}
 			else {
 				if (((moves[i] & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == QUEEN) {
-					orderingValues[moves[i].id] += (pieceValues[QUEEN] - pieceValues[PAWN]) + PROMOTION_ORDER;
+					orderingValues[i] += (pieceValues[QUEEN] - pieceValues[PAWN]) + PROMOTION_ORDER;
 				}
 				else if (((moves[i] & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == ROOK) {
-					orderingValues[moves[i].id] += (pieceValues[ROOK] - pieceValues[PAWN]) + PROMOTION_ORDER;
+					orderingValues[i] += (pieceValues[ROOK] - pieceValues[PAWN]) + PROMOTION_ORDER;
 				}
 				else if (((moves[i] & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == BISHOP) {
-					orderingValues[moves[i].id] += (pieceValues[BISHOP] - pieceValues[PAWN]) + PROMOTION_ORDER;
+					orderingValues[i] += (pieceValues[BISHOP] - pieceValues[PAWN]) + PROMOTION_ORDER;
 				}
-				else orderingValues[moves[i].id] += (pieceValues[KNIGHT] - pieceValues[PAWN]) + PROMOTION_ORDER;
+				else orderingValues[i] += (pieceValues[KNIGHT] - pieceValues[PAWN]) + PROMOTION_ORDER;
 			}
 		}
 		else {
 			if (moves[i] == killers[ply][KILLER_PRIMARY]) {
-				orderingValues[moves[i].id] += KILLER_ORDER;
+				orderingValues[i] += KILLER_ORDER;
 			}
 			else if (moves[i] == killers[ply][KILLER_SECONDARY]) {
-				orderingValues[moves[i].id] += KILLER_ORDER - 1;
+				orderingValues[i] += KILLER_ORDER - 1;
 			}
 			else {
-				orderingValues[moves[i].id] += historyMoves[moves[i] & MOVE_FROM_SQ_MASK][(moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT];
+				orderingValues[i] += historyMoves[moves[i] & MOVE_FROM_SQ_MASK][(moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT];
 			}
 		}
 	}
-	std::sort(moves, moves + numOfMoves, [&orderingValues](Move lhs, Move rhs) {return orderingValues[lhs.id] > orderingValues[rhs.id]; });
+	quicksort(moves, orderingValues, 0, numOfMoves - 1);
+}
+
+inline int Engine::partition(int *arr, int *order, const int left, const int right) {
+	const int mid = left + (right - left) / 2;
+	const int pivot = order[mid];
+	// move the mid point value to the front.
+	//std::swap(arr[mid], arr[left]);
+	int temp = arr[left];
+	arr[left] = arr[mid];
+	arr[mid] = temp;
+	temp = order[left];
+	order[left] = order[mid];
+	order[mid] = temp;
+
+	int i = left + 1;
+	int j = right;
+	while (i <= j) {
+		while (i <= j && order[i] <= pivot) {
+			i++;
+		}
+
+		while (i <= j && order[j] > pivot) {
+			j--;
+		}
+
+		if (i < j) {
+			//std::swap(arr[i], arr[j]);
+			temp = arr[j];
+			arr[j] = arr[i];
+			arr[i] = temp;
+			temp = order[j];
+			order[j] = order[i];
+			order[i] = temp;
+
+		}
+	}
+	//std::swap(arr[i - 1], arr[left]);
+	temp = arr[left];
+	arr[left] = arr[i - 1];
+	arr[i - 1] = temp;
+	temp = order[left];
+	order[left] = order[i - 1];
+	order[i - 1] = temp;
+
+	return i - 1;
+}
+
+inline void Engine::quicksort(int *arr, int *order, const int left, const int right) {
+	if (left >= right) {
+		return;
+	}
+
+	int part = partition(arr, order, left, right);
+
+	quicksort(arr, order, left, part - 1);
+	quicksort(arr, order, part + 1, right);
 }
 
 int Engine::iterativeDeepening(int *moves, int numOfMoves) {
@@ -446,6 +512,10 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 	for (currDepth = 1; currDepth <= maxDepth; currDepth++) {
 		searchStart = timer.mseconds;
 		score = findBestMove(moves, numOfMoves, currDepth, alpha, beta, &newBest);
+		if (newBest == EMPTY_MOVE) {
+			std::cout << "TIMES UP" << std::endl;
+			break;
+		}
 		if (score <= alpha) {
 			alpha -= pow(2 * WINDOW_SIZE, windowMissCount + 1);
 			currDepth--;
@@ -461,10 +531,6 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 		windowMissCount = 0;
 		alpha = score - WINDOW_SIZE;
 		beta = score + WINDOW_SIZE;
-		if (newBest == NO_ID) {
-			std::cout << "TIMES UP" << std::endl;
-			break;
-		}
 		infoNPS(nodeCount - lastNodeCount, searchStart);
 		infoPV(currDepth, INVALID);
 		getSearchStats(currDepth, lastNodeCount, searchStart);

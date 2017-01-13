@@ -45,6 +45,8 @@ class Engine {
 		Mode mode;
 		Timer timer;
 	private:
+		void quicksort(int *arr, int *order, const int left, const int right);
+		int partition(int *arr, int *order, const int left, const int right);
 		unsigned long calculateTimeForMove(Color side);
 		int wmsLeft;
 		int wTimeInc;

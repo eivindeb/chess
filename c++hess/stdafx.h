@@ -457,12 +457,10 @@ struct TranspositionEntry {
 	capture			(20 bit)
 	en passant		(21 bit)
 	promotion		(22 bit)
-	promoted to		(23-24 bit)
-	castle long		(25 bit)
-	castle short	(26 bit)
-	id				(27-31 bit) // TODO, have now changed promoted to, to just 2 bits, so have to change that in all calls and checks. Also have to add id to move add.
-									(thinking a counter for reset each square in move gen)
-
+	promoted to		(23-25 bit)
+	castle long		(26 bit)
+	castle short	(27 bit)
+	// Can change promoted to to two bits
 */
 
 // TODO: reference additional headers your program requires here
