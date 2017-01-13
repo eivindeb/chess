@@ -8,12 +8,13 @@
 #include "Communication.h"
 #include <iostream>
 #include <string>
+#include <chrono>
 #include <sstream>
 
 
 int main()
 {	
-	Engine myengine = Engine(1, 5, "", true);
+	Engine myengine = Engine(1, 5, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -", true);
 	/*Move moves[218];
 	int numOfMoves;
 	int index;
@@ -29,7 +30,12 @@ int main()
 	int move;
 	myengine.board.printBoard();
 	//std::cout << "Best was: " << myengine.miniMax(3);
+	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 	myengine.perft(5);
+	std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+	std::cout << duration << std::endl;
+	
 
 	/*while (1) {
 		if (myengine.board.inCheck(myengine.board.sideToMove)) {
