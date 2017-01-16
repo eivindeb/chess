@@ -35,7 +35,7 @@
 
 #define R	2	//reduction depth
 
-#define FIXED_SEARCH_DURATION	15*1000;
+#define FIXED_SEARCH_DURATION	30*1000;
 
 //49999991
 
@@ -438,11 +438,11 @@ inline int Engine::partition(int *arr, int *order, const int left, const int rig
 	int i = left + 1;
 	int j = right;
 	while (i <= j) {
-		while (i <= j && order[i] <= pivot) {
+		while (i <= j && order[i] >= pivot) {
 			i++;
 		}
 
-		while (i <= j && order[j] > pivot) {
+		while (i <= j && order[j] < pivot) {
 			j--;
 		}
 
