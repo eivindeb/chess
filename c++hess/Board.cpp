@@ -487,10 +487,12 @@ int Board::getCaptureMoves(int *moves) {
 						}
 						if (enPassant != -1) {
 							if ((sq + pieceDeltas[PAWN][dirMod]) == enPassant) {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, 1);
+								moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, 1);
+								moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
 							}
 							else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, 1);
+								moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, 1);
+								moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
 							}
 						}
 					}
@@ -720,8 +722,8 @@ void Board::moveUnmake() {
 
 	int fromSq = prevState.move & MOVE_FROM_SQ_MASK;
 	int toSq = ((prevState.move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
-	Piece movedPiece = Piece((prevState.move & MOVE_MOVED_PIECE_MASK) >> MOVE_MOVED_PIECE_SHIFT);
-	Piece attackedPiece = Piece((prevState.move & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT);
+	Piece movedPiece = Piece(((prevState.move & MOVE_MOVED_PIECE_MASK) >> MOVE_MOVED_PIECE_SHIFT));
+	Piece attackedPiece = Piece(((prevState.move & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT));
 
 	sideToMove = Color(sideToMove*(-1));
 	zobristKey ^= zobrist.side;

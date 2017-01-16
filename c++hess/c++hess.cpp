@@ -8,13 +8,12 @@
 #include "Communication.h"
 #include <iostream>
 #include <string>
-#include <chrono>
 #include <sstream>
 
 
 int main()
 {	
-	Engine myengine = Engine(1, 5, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -", true);
+	Engine myengine = Engine(1, 20, "", true);
 	/*Move moves[218];
 	int numOfMoves;
 	int index;
@@ -26,18 +25,13 @@ int main()
 
 	int moves[218];
 	int numOfMoves;
-	int moveIndex;
+	int moveIndex = 0;
 	int move;
 	myengine.board.printBoard();
 	//std::cout << "Best was: " << myengine.miniMax(3);
-	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-	myengine.perft(5);
-	std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-	std::cout << duration << std::endl;
 	
 
-	/*while (1) {
+	while (1) {
 		if (myengine.board.inCheck(myengine.board.sideToMove)) {
 			numOfMoves = myengine.board.getLegalMovesInCheck(moves);
 			if (numOfMoves == 0) break;
@@ -60,10 +54,10 @@ int main()
 		}
 		else {
 			myengine.board.moveMake(move);
-			std::cout << "Move played: " << SQ_FILE(move & MOVE_FROM_SQ_MASK) << SQ_RANK(move & MOVE_FROM_SQ_MASK) << SQ_FILE((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << SQ_RANK((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
+			std::cout << "Move played: " << SQ_FILE(move & MOVE_FROM_SQ_MASK) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << std::endl;
 			myengine.board.printBoard();
 		}
-	}*/
+	}
 	std::string side = (myengine.board.sideToMove == WHITE) ? "Black" : "White";
 	std::cout << side << " won in " << myengine.board.halfMoveCount / 2 << " moves!" << std::endl;
 	std::cin.get();

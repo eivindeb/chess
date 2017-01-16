@@ -35,7 +35,7 @@
 
 #define R	2	//reduction depth
 
-#define FIXED_SEARCH_DURATION	30*1000;
+#define FIXED_SEARCH_DURATION	15*1000;
 
 //49999991
 
@@ -140,7 +140,6 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 				score = -alphaBeta(-beta, -alpha, newDepth, ply + 1, ALLOW_NULL, IS_PV);
 			}
 		}
-		
 		board.moveUnmake();
 		if (score > alpha) {
 			if (score >= beta) {
@@ -190,6 +189,7 @@ int Engine::quiescence(int alpha, int beta) {
 			continue;
 		}
 		score = -quiescence(-beta, -alpha);
+
 		board.moveUnmake();
 
 		if (score >= beta) {
@@ -370,7 +370,7 @@ int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int b
 				return beta;
 			}
 			tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, alpha, TT_ALPHA, moves[bestIndex]);
-			infoPV(depth, score);
+			//infoPV(depth, score);
 		}
 	}
 
@@ -531,8 +531,8 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 		windowMissCount = 0;
 		alpha = score - WINDOW_SIZE;
 		beta = score + WINDOW_SIZE;
-		infoNPS(nodeCount - lastNodeCount, searchStart);
-		infoPV(currDepth, INVALID);
+		//infoNPS(nodeCount - lastNodeCount, searchStart);
+		//infoPV(currDepth, INVALID);
 		getSearchStats(currDepth, lastNodeCount, searchStart);
 		bestMove = newBest;
 		if (wmsLeft != -1 && (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE > searchLength - timer.mseconds) { // next depth would take longer than remaining time
@@ -542,7 +542,7 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 		}
 		lastNodeCount = nodeCount;
 	}
-	infoNPS(nodeCount, 0);
+	//infoNPS(nodeCount, 0);
 	getSearchStats(-1, 0, 0);
 
 	return bestMove;
@@ -708,7 +708,7 @@ void Engine::infoPV(int searchDepth, int score) {
 		if (!(lastMoveFlag = tTable.getPV(board.zobristKey, &pvMove))) {
 			break;
 		}
-		pvSS << SQ_FILE(pvMove & MOVE_FROM_SQ_MASK) << SQ_RANK(pvMove & MOVE_FROM_SQ_MASK) << SQ_FILE((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << SQ_RANK((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << " ";
+		pvSS << SQ_FILE((pvMove & MOVE_FROM_SQ_MASK)) << SQ_RANK((pvMove & MOVE_FROM_SQ_MASK)) << SQ_FILE(((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << " ";
 		board.moveMake(pvMove);
 		pvLength++;
 		//if (lastMoveFlag != TT_EXACT) {

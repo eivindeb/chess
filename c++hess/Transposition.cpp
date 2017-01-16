@@ -8,7 +8,7 @@ Transposition::Transposition(unsigned long long tableSize) {
 
 TT_FLAG Transposition::getPV(unsigned long long zobristKey, int *pvMove) {
 	TranspositionEntry * entry = &table[zobristKey % size];
-	if (entry->zobristKey == zobristKey && entry->bestMove == -1) {
+	if (entry->zobristKey == zobristKey && entry->bestMove != -1) {
 		*pvMove = entry->bestMove;
 		return entry->flag;
 	}
