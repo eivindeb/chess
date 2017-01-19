@@ -9,12 +9,13 @@
 #include <sstream>
 #include <vector>
 #include <math.h>
+#include <iomanip>
 
 #define HASH_ORDER		10000000
 #define CPT_ORDER		5000
 #define PROMOTION_ORDER	5000
 #define KILLER_ORDER	1000
-#define SEE_ORDER_DEPTH	0
+#define SEE_ORDER_DEPTH	-1
 
 #define EMPTY_MOVE		-1
 
@@ -72,7 +73,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 	int bestMoveIndex = 0;
 	int ttVal = 0;
 	bool raisedAlpha = false;
-	bool fPrune = false;
+	//bool fPrune = false;
 
 	int newDepth = depthLeft - 1;
 
@@ -88,7 +89,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 		if (score >= beta) return beta;
 	}
 
-	/*if (depthLeft == 1 && !inCheck && (evaluatePosition() + pieceValues[BISHOP]) < alpha) { // futility pruning
+	/*if (depthLeft == 1 && !inCheck && (evaluatePosition() + pieceValues[BISHOP]) < alpha) { // futility pruning, TODO: stop pruning close to mate value
 		fPrune = true;
 	}
 	else if (depthLeft == 2 && !inCheck && (evaluatePosition() + pieceValues[ROOK]) < alpha) {
@@ -127,7 +128,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 			newDepth--;
 		}
 
-		/*if (fPrune && !(moves[i].flags & MFLAGS_CPT) && !(moves[i].flags & MFLAGS_PROMOTION) && !(board.inCheck(board.sideToMove))) { // futility pruning
+		/*if (fPrune && !(moves[i] & MOVE_CAPTURE_MASK) && !(moves[i] & MOVE_PROMOTION_MASK) && !(board.inCheck(board.sideToMove))) { // futility pruning
 			board.moveUnmake();
 			continue;
 		}*/
@@ -180,9 +181,9 @@ int Engine::quiescence(int alpha, int beta) {
 		if (!(board.phaseFlag & PHASE_EG) && !(moves[i] & MOVE_PROMOTION_MASK) && standPat + pieceValues[(moves[i] & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] + 200 < alpha) { // delta pruning
 			continue;
 		}
-		//if (SEE(moves[i].toSq) < 0) {
-		//	continue;
-		//}
+		if (SEE(((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) < 0) {
+			continue;
+		}
 		board.moveMake(moves[i]);
 		if (board.inCheck(Color(board.sideToMove*(-1)))) {
 			board.moveUnmake();
@@ -370,7 +371,7 @@ int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int b
 				return beta;
 			}
 			tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, alpha, TT_ALPHA, moves[bestIndex]);
-			//infoPV(depth, score);
+			infoPV(depth, score);
 		}
 	}
 
@@ -379,8 +380,8 @@ int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int b
 }
 
 inline void Engine::sortMoves(int *moves, int numOfMoves, int bestMove, int ply) {
-	int orderingValues[218] = { 0 };
 	for (int i = 0; i < numOfMoves; i++) {
+		orderingValues[i] = 0;
 		if (bestMove != EMPTY_MOVE && moves[i] == bestMove) {
 			orderingValues[i] += HASH_ORDER;
 			continue;
@@ -388,14 +389,14 @@ inline void Engine::sortMoves(int *moves, int numOfMoves, int bestMove, int ply)
 		if (moves[i] & MOVE_CAPTURE_MASK || moves[i] & MOVE_PROMOTION_MASK) {
 			if (moves[i] & MOVE_CAPTURE_MASK) {
 				if (ply <= SEE_ORDER_DEPTH) {
-					orderingValues[i] += SEE((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
+					orderingValues[i] += SEE(((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT));
 					orderingValues[i] += (orderingValues[i] > 0) ? CPT_ORDER : 0;
 				}
 				else {
 					orderingValues[i] += (pieceValues[(moves[i] & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] - pieceValues[(moves[i] & MOVE_MOVED_PIECE_MASK) >> MOVE_MOVED_PIECE_SHIFT]) + CPT_ORDER;
 				}
 			}
-			else {
+			if (moves[i] & MOVE_PROMOTION_MASK) {
 				if (((moves[i] & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == QUEEN) {
 					orderingValues[i] += (pieceValues[QUEEN] - pieceValues[PAWN]) + PROMOTION_ORDER;
 				}
@@ -508,7 +509,14 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 	unsigned long long lastNodeCount = 0;
 	int currDepth;
 	decHistoryTable();
-	std::cout << "Depth\tNodes\t\tTime\t\tNPS\tScore\tPV" << std::endl;
+
+	std::cout << std::left << std::setw(6) << std::setfill(' ') << "Depth";
+	std::cout << std::left << std::setw(10) << std::setfill(' ') << "Nodes";
+	std::cout << std::left << std::setw(10) << std::setfill(' ') << "Time(ms)";
+	std::cout << std::left << std::setw(14) << std::setfill(' ') << "kNPS";
+	std::cout << std::left << std::setw(8) << std::setfill(' ') << "Score";
+	std::cout << std::left << std::setw(10) << std::setfill(' ') << "PV" << std::endl;
+
 	for (currDepth = 1; currDepth <= maxDepth; currDepth++) {
 		searchStart = timer.mseconds;
 		score = findBestMove(moves, numOfMoves, currDepth, alpha, beta, &newBest);
@@ -531,8 +539,6 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 		windowMissCount = 0;
 		alpha = score - WINDOW_SIZE;
 		beta = score + WINDOW_SIZE;
-		//infoNPS(nodeCount - lastNodeCount, searchStart);
-		//infoPV(currDepth, INVALID);
 		getSearchStats(currDepth, lastNodeCount, searchStart);
 		bestMove = newBest;
 		if (wmsLeft != -1 && (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE > searchLength - timer.mseconds) { // next depth would take longer than remaining time
@@ -540,9 +546,11 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 			timer.stop();
 			break;
 		}
+		if (numOfMoves == 1 && currDepth >= 4) { // only one legal reply, only search to depth 4 (nothing to decide, so why search it). 
+			break;
+		}
 		lastNodeCount = nodeCount;
 	}
-	//infoNPS(nodeCount, 0);
 	getSearchStats(-1, 0, 0);
 
 	return bestMove;
@@ -634,21 +642,36 @@ int Engine::SEE(int sq) { // TODO, can check for only legal moves, but this will
 	return score;
 }
 
-inline void Engine::getSearchStats(int searchDepth, unsigned long long prevNodeCount, unsigned long startTime) {
-	if (searchDepth == -1) {
-		std::cout << "Total:\t";
+inline void Engine::getSearchStats(int searchDepth, unsigned long long prevNodeCount, unsigned long startTime) { // TODO, implement window misses
+	const char separator = ' ';
+	const int nameWidth = 6;
+	const int numWidth = 10;
+
+	switch (mode) {
+		case PROTO_NOTHING:
+			if (searchDepth == -1) {
+				std::cout << "Total:\t";
+			}
+			else {
+				std::cout << std::left << std::setw(nameWidth) << std::setfill(separator) << searchDepth;
+			}
+			//std::cout << "Search to depth " << searchDepth << " took " << timer.mseconds - startTime << " milliseconds, and searched " << nodeCount - prevNodeCount << " nodes" << std::endl;
+			std::cout << std::left << std::setw(numWidth) << std::setfill(separator) << nodeCount - prevNodeCount;
+			std::cout << std::left << std::setw(numWidth) << std::setfill(separator) << timer.mseconds - startTime;
+			infoNPS(nodeCount - prevNodeCount, startTime);
+			if (searchDepth != -1) {
+				std::cout << "\t";
+				infoPV(searchDepth, INVALID);
+			}
+			std::cout << std::endl;
+			break;
+		case PROTO_UCI:
+			infoNPS(nodeCount - prevNodeCount, startTime);
+			if (searchDepth != -1)
+				infoPV(searchDepth, INVALID);
+			break;
 	}
-	else {
-		std::cout << searchDepth << "\t";
-	}
-	//std::cout << "Search to depth " << searchDepth << " took " << timer.mseconds - startTime << " milliseconds, and searched " << nodeCount - prevNodeCount << " nodes" << std::endl;
-	std::cout << nodeCount - prevNodeCount << "\t\t" << timer.mseconds - startTime << "\tms\t";
-	infoNPS(nodeCount - prevNodeCount, startTime);
-	if (searchDepth != -1) {
-		std::cout << "\t";
-		infoPV(searchDepth, INVALID);
-	}
-	std::cout << std::endl;
+	
 }
 
 inline unsigned long Engine::calculateTimeForMove(Color side) {
@@ -679,7 +702,7 @@ inline void Engine::infoNPS(unsigned long long nodes, unsigned long startTime) {
 	if (elapsedTime) {
 		switch (mode) {
 			case PROTO_NOTHING:
-				std::cout << (nodes / double((timer.mseconds - startTime))) * 1000;
+				std::cout << std::left << std::setw(6) << std::setfill(' ') << (nodes / double((timer.mseconds - startTime)));
 				break;
 			case PROTO_UCI:
 				std::stringstream ss;
@@ -689,11 +712,14 @@ inline void Engine::infoNPS(unsigned long long nodes, unsigned long startTime) {
 		}
 	}
 	else if (mode == PROTO_NOTHING) {
-		std::cout << "N/A";
+		std::cout << std::left << std::setw(7) << std::setfill(' ') << "N/A";
 	}
 }
 
 void Engine::infoPV(int searchDepth, int score) {
+	if (score != INVALID && mode == PROTO_NOTHING) {
+		return;
+	}
 	int pvLength = 0;
 	TT_FLAG lastMoveFlag;
 	int pvMove;
@@ -728,9 +754,9 @@ void Engine::infoPV(int searchDepth, int score) {
 	else if (mode == PROTO_UCI) {
 		pvSS << "score cp " << score;
 	}
-	else if (mode == PROTO_NOTHING) {
-		pvString = std::to_string(score) + "\t" + pvSS.str();
-	}
+	//else if (mode == PROTO_NOTHING) {
+	//	pvString = std::to_string(score) + "\t" + pvSS.str();
+	//}
 
 	for (int j = 0; j < pvLength; j++) {
 		board.moveUnmake();

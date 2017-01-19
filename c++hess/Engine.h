@@ -45,6 +45,7 @@ class Engine {
 		Mode mode;
 		Timer timer;
 	private:
+		int orderingValues[218]; // optimization, putting it here so that it isnt initialized every time in sortMoves
 		void quicksort(int *arr, int *order, const int left, const int right);
 		int partition(int *arr, int *order, const int left, const int right);
 		unsigned long calculateTimeForMove(Color side);
