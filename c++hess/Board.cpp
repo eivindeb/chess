@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <sstream>
+#include <iomanip>
 
 Board::Board(std::string fen) {
 	for (int sq = 0; sq < 120; sq++) {
@@ -1064,6 +1065,7 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 	boardColor[sq] = side;
 }
 
+
 inline void Board::setPiecePositionTotal() {
 	positionTotal = 0;
 	int *tablePtr;
@@ -1244,22 +1246,115 @@ int Board::getSqAttackers(int *attackingSquares, int chkdSq, Color attackColor) 
 }
 
 void Board::printMoves(int *moves, int numOfMoves) {
-	std::cout << "Number of moves: " << numOfMoves << std::endl;
+	int pieceNameLength = 10;
+	int moveLength = 8;
+	int numberLength = 4;
+
+	std::cout << std::left << std::setw(numberLength) << std::setfill(' ') << "#";
+	std::cout << std::left << std::setw(moveLength) << std::setfill(' ') << "Move";
+	std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Moved";
+	std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Attacked";
+	std::cout << "Special" << std::endl;
+
 	for (int i = 0; i < numOfMoves; i++) {
-		std::cout << std::to_string(i) << ".\t" << char(((moves[i] & MOVE_FROM_SQ_MASK) % 8) + 97) << ((moves[i] & MOVE_FROM_SQ_MASK) >> 4) + 1 << " " << char(((moves[i] & MOVE_TO_SQ_MASK) % 8) + 97) << ((moves[i] & MOVE_TO_SQ_MASK) >> 4) + 1;
-		if (moves[i] & MOVE_CAPTURE_MASK) {
-			std::cout << "\tCapture";
-		} if (moves[i] & MOVE_CASTLE_LONG_MASK) {
-			std::cout << "\tCastle long";
-		} if (moves[i] & MOVE_CASTLE_SHORT_MASK) {
-			std::cout << "\tCastle short";
-		} if (moves[i] & MOVE_EN_PASSANT_MASK) {
-			std::cout << "\tEn Passant";
-		} if (moves[i] & MOVE_PROMOTION_MASK) {
-			std::cout << "\tPromotion";
-		}
-		std::cout << std::endl;
+		std::cout << std::left << std::setw(numberLength) << std::setfill(' ') << i;
+		printMove(moves[i]);
 	}
+}
+
+void Board::printMove(int move) {
+	int pieceNameLength = 10;
+	int moveLength = 8;
+
+	bool firstSpecial = true;
+
+	std::stringstream moveSS;
+	moveSS << SQ_FILE((move & MOVE_FROM_SQ_MASK)) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT));
+	std::cout << std::left << std::setw(moveLength) << std::setfill(' ') << moveSS.str();
+
+	switch ((move & MOVE_MOVED_PIECE_MASK) >> MOVE_MOVED_PIECE_SHIFT) {
+		case PAWN:
+			std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Pawn";
+			break;
+		case KNIGHT:
+			std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Knight";
+			break;
+		case BISHOP:
+			std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Bishop";
+			break;
+		case ROOK:
+			std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Rook";
+			break;
+		case QUEEN:
+			std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Queen";
+			break;
+		case KING:
+			std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "King";
+			break;
+	}
+	if (move & MOVE_CAPTURE_MASK) {
+		switch ((move & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT) {
+			case PAWN:
+				std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Pawn";
+				break;
+			case KNIGHT:
+				std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Knight";
+				break;
+			case BISHOP:
+				std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Bishop";
+				break;
+			case ROOK:
+				std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Rook";
+				break;
+			case QUEEN:
+				std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "Queen";
+				break;
+			case KING:
+				std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "King";
+				break;
+		}
+	}
+	else {
+		std::cout << std::left << std::setw(pieceNameLength) << std::setfill(' ') << "N/A";
+	}
+
+	if (move & MOVE_EN_PASSANT_MASK) {
+		if (!firstSpecial)
+			std::cout << ", ";
+		std::cout << "En Passant";
+	}
+
+	if (move & MOVE_PROMOTION_MASK) {
+		if (!firstSpecial)
+			std::cout << ", ";
+		std::cout << "Promotion to ";
+		switch ((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) {
+		case QUEEN:
+			std::cout << "Queen";
+			break;
+		case ROOK:
+			std::cout << "Rook";
+			break;
+		case BISHOP:
+			std::cout << "Bishop";
+			break;
+		case KNIGHT:
+			std::cout << "Knight";
+			break;
+		}
+	}
+
+	if (move & MOVE_CASTLE_LONG_MASK) {
+		if (!firstSpecial)
+			std::cout << ", ";
+		std::cout << "Castle long";
+	}
+	else if (move & MOVE_CASTLE_SHORT_MASK) {
+		if (!firstSpecial)
+			std::cout << ", ";
+		std::cout << "Castle short";
+	}
+	std::cout << std::endl;
 }
 
 void Board::printBoard() {

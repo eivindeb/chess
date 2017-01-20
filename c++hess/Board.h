@@ -20,6 +20,7 @@ class Board {
 		int halfMoveClk;
 		int enPassant;
 		void printBoard();
+		void printMove(int move);
 		std::string getFenString();
 		void moveMake(int move);
 		void moveMakeNull();
