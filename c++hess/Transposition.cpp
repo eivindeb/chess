@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "Transposition.h"
 
+#define ENTRY_LIFE 0
+
 Transposition::Transposition(unsigned long long tableSize) {
 	size = (tableSize / sizeof(TranspositionEntry)) - 1;
 	tableAlways = new TranspositionEntry[tableSize];
@@ -31,7 +33,7 @@ void Transposition::saveEntry(unsigned long long zobristKey, uint8_t depth, uint
 		return;
 	}
 
-	if (entry->depth < depth) {
+	if (entry->age + ENTRY_LIFE < age || (entry->depth == depth && flag == TT_EXACT) || entry->depth < depth) {
 		tableAlways[hashIndex] = *entry;
 		entry->zobristKey = zobristKey;
 		entry->depth = depth;
