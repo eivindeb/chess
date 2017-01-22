@@ -6,13 +6,14 @@ class Board {
 		int getSqOfFirstPieceOnRay(int fromSq, int ray);
 		Piece board[128];
 		Color boardColor[128];
+		int boardPieceIndex[128];
 		Color sideToMove;
 		State history[1024]; // max search depth
 		int pieceCount[18];
 		int historyIndex;
 		int wCastlingRights;
 		int bCastlingRights;
-		int getCaptureMoves(int *moves);
+		int getQuiescenceMoves(int *moves);
 		int getLegalMoves(int *moves);
 		int getLegalMovesInCheck(int *moves);
 		void printMoves(int *moves, int numOfMoves);
@@ -41,6 +42,7 @@ class Board {
 		unsigned long long getZobristKey();
 		unsigned long long repStack[1024];
 		int	repIndex;
+		int pieceLists[12][11];
 	private:
 		void moveAdd(int *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int capture);
 		int wKingSq;
@@ -48,5 +50,8 @@ class Board {
 		void setPiecePositionTotal();
 		void clearSq(int sq);
 		void setSq(int sq, Piece piece, Color side);
+		void pieceListRemovePiece(int sq, Piece piece, Color side);
+		void pieceListAddPiece(int sq, Piece piece, Color side);
+		void pieceListMove(int fromSq, int toSq, Piece piece, Color side);
 		unsigned long long rand64();
 };

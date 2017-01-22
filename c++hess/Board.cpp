@@ -36,6 +36,12 @@ void Board::loadFromFen(std::string fen) {
 	for (int i = 0; i < 18; i++) {
 		pieceCount[i] = 0;
 	}
+	for (int i = 0; i < 12; i++) {
+		pieceLists[i][0] = 0;
+		for (int j = 1; j < 11; j++) {
+			pieceLists[i][j] = -1;
+		}
+	}
 
 	zobristKey = 0;
 	phaseFlag = PHASE_MG;
@@ -113,51 +119,63 @@ void Board::loadFromFen(std::string fen) {
 		case 'P':
 			setSq(sq, PAWN, WHITE);
 			materialTotal += pieceValues[PAWN];
+			pieceListAddPiece(sq, PAWN, WHITE);
 			break;
 		case 'p':
 			setSq(sq, PAWN, BLACK);
 			materialTotal -= pieceValues[PAWN];
+			pieceListAddPiece(sq, PAWN, BLACK);
 			break;
 		case 'N':
 			setSq(sq, KNIGHT, WHITE);
 			materialTotal += pieceValues[KNIGHT];
+			pieceListAddPiece(sq, KNIGHT, WHITE);
 			break;
 		case 'n':
 			setSq(sq, KNIGHT, BLACK);
 			materialTotal -= pieceValues[KNIGHT];
+			pieceListAddPiece(sq, KNIGHT, BLACK);
 			break;
 		case 'B':
 			setSq(sq, BISHOP, WHITE);
 			materialTotal += pieceValues[BISHOP];
+			pieceListAddPiece(sq, BISHOP, WHITE);
 			break;
 		case 'b':
 			setSq(sq, BISHOP, BLACK);
 			materialTotal -= pieceValues[BISHOP];
+			pieceListAddPiece(sq, BISHOP, BLACK);
 			break;
 		case 'R':
 			setSq(sq, ROOK, WHITE);
 			materialTotal += pieceValues[ROOK];
+			pieceListAddPiece(sq, ROOK, WHITE);
 			break;
 		case 'r':
 			setSq(sq, ROOK, BLACK);
 			materialTotal -= pieceValues[ROOK];
+			pieceListAddPiece(sq, ROOK, BLACK);
 			break;
 		case 'Q':
 			setSq(sq, QUEEN, WHITE);
 			materialTotal += pieceValues[QUEEN];
+			pieceListAddPiece(sq, QUEEN, WHITE);
 			break;
 		case 'q':
 			setSq(sq, QUEEN, BLACK);
 			materialTotal -= pieceValues[QUEEN];
+			pieceListAddPiece(sq, QUEEN, BLACK);
 			break;
 		case 'K':
 			setSq(sq, KING, WHITE);
 			materialTotal += pieceValues[KING];
+			pieceListAddPiece(sq, KING, WHITE);
 			wKingSq = sq;
 			break;
 		case 'k':
 			setSq(sq, KING, BLACK);
 			materialTotal -= pieceValues[KING];
+			pieceListAddPiece(sq, KING, BLACK);
 			bKingSq = sq;
 			break;
 		case '/':
@@ -166,6 +184,7 @@ void Board::loadFromFen(std::string fen) {
 		default: // any number of empty squares
 			for (int i = 0; i < int(c - '0'); i++) {
 				setSq(sq, EMPTY, NONE);
+				boardPieceIndex[sq] = -1;
 				sq++;
 			}
 			sq--;
@@ -460,7 +479,7 @@ int Board::getSqOfFirstPieceOnRay(int fromSq, int ray) {
 	return -1;
 }
 
-int Board::getCaptureMoves(int *moves) {
+int Board::getQuiescenceMoves(int *moves) {
 	int movesInPosition = 0;
 	int newPos;
 
@@ -470,6 +489,11 @@ int Board::getCaptureMoves(int *moves) {
 				if (board[sq] <= 2) {
 					if (board[sq] == PAWN) {
 						int dirMod = (sideToMove == WHITE) ? 0 : 4;
+						if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
+							if (board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
+								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 1], EMPTY, 0);
+							}
+						}
 						if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod]) && boardColor[sq + pieceDeltas[PAWN][dirMod]] == (sideToMove*(-1))) {
 							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
 								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], board[sq + pieceDeltas[PAWN][dirMod]], 1);
@@ -584,6 +608,7 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 	int fromSq = move & MOVE_FROM_SQ_MASK;
 	int toSq = ((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
 	Piece movedPiece = Piece((move & MOVE_MOVED_PIECE_MASK) >> MOVE_MOVED_PIECE_SHIFT);
+	Piece attackedPiece = Piece((move & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT);
 
 	if (movedPiece == KING) {
 		if (boardColor[fromSq] == WHITE) {
@@ -616,37 +641,52 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 
 	if (move & MOVE_CAPTURE_MASK) {
 		halfMoveClk = -1;
-		materialTotal += (pieceValues[((move & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT)] * sideToMove);
-		clearSq(toSq);
+		materialTotal += (pieceValues[attackedPiece] * sideToMove);
+		if (move & MOVE_EN_PASSANT_MASK) {
+			if ((toSq % 8) - (fromSq % 8) == WEST) {
+				clearSq(fromSq + WEST);
+				pieceListRemovePiece(fromSq + WEST, PAWN, Color(sideToMove * (-1)));
+			}
+			else {
+				clearSq(fromSq + EAST);
+				pieceListRemovePiece(fromSq + EAST, PAWN, Color(sideToMove * (-1)));
+			}
+		}
+		else {
+			clearSq(toSq);
+			pieceListRemovePiece(toSq, attackedPiece, Color(sideToMove * (-1)));
+		}
+	}
+
+	if (movedPiece == PAWN) {
+		halfMoveClk = -1;
+		if (abs(toSq - fromSq) == NN) { // pawn double move
+			enPassant = (fromSq + toSq) / 2;
+			zobristKey ^= zobrist.enPassant[enPassant % 8];
+		}
+		else if (enPassant != -1) {
+			enPassant = -1;
+		}
+	}
+	else if (enPassant != -1) {
+		enPassant = -1;
 	}
 
 	if (move & MOVE_PROMOTION_MASK) {
-		if (((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == QUEEN) {
-			materialTotal += (pieceValues[QUEEN] - pieceValues[PAWN])*sideToMove;
-			clearSq(fromSq);
-			setSq(fromSq, QUEEN, sideToMove);
-		}
-		else if (((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == ROOK) {
-			materialTotal += (pieceValues[ROOK] - pieceValues[PAWN])*sideToMove;
-			clearSq(fromSq);
-			setSq(fromSq, ROOK, sideToMove);
-		}
-		else if (((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == BISHOP) {
-			materialTotal += (pieceValues[BISHOP] - pieceValues[PAWN])*sideToMove;
-			clearSq(fromSq);
-			setSq(fromSq, BISHOP, sideToMove);
-		}
-		else if (((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == KNIGHT) {
-			materialTotal += (pieceValues[KNIGHT] - pieceValues[PAWN])*sideToMove;
-			clearSq(fromSq);
-			setSq(fromSq, KNIGHT, sideToMove);
-		}
+		pieceListRemovePiece(fromSq, PAWN, sideToMove);
+		Piece promotedTo = Piece(((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT));
+		materialTotal += (pieceValues[promotedTo] - pieceValues[PAWN])*sideToMove;
+		clearSq(fromSq);
+		setSq(fromSq, promotedTo, sideToMove);
+		pieceListAddPiece(fromSq, promotedTo, sideToMove);
+		movedPiece = promotedTo;
 	}
 
 	else if (move & MOVE_CASTLE_LONG_MASK) {
+		pieceListMove(toSq + WEST * 2, toSq + EAST, ROOK, sideToMove);
 		setSq(toSq + EAST, ROOK, sideToMove);
 		clearSq(toSq + WEST * 2);
-
+		
 		if (sideToMove == WHITE) {
 			wCastlingRights = 0;
 		}
@@ -655,6 +695,7 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 		}
 	}
 	else if (move & MOVE_CASTLE_SHORT_MASK) {
+		pieceListMove(toSq + EAST, toSq + WEST, ROOK, sideToMove);
 		setSq(toSq + WEST, ROOK, sideToMove);
 		clearSq(toSq + EAST);
 
@@ -666,29 +707,10 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 		}
 	}
 
+	pieceListMove(fromSq, toSq, movedPiece, sideToMove);
 	setSq(toSq, board[fromSq], boardColor[fromSq]);
 	clearSq(fromSq);
 
-	if (move & MOVE_EN_PASSANT_MASK) {
-		if ((toSq % 8) - (fromSq % 8) == WEST) {
-			clearSq(fromSq + WEST);
-		}
-		else {
-			clearSq(fromSq + EAST);
-		}
-	}
-	if (movedPiece == PAWN) {
-		halfMoveClk = -1;
-		if (abs(toSq - fromSq) == NN) { // pawn double move
-			enPassant = (fromSq + toSq) / 2;
-			zobristKey ^= zobrist.enPassant[enPassant % 8];
-		}
-		else if (enPassant != -1) {
-			enPassant = -1;
-		}
-	} else if (enPassant != -1) {
-		enPassant = -1;
-	}
 
 	halfMoveCount++;
 	halfMoveClk++;
@@ -696,6 +718,16 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 	zobristKey ^= zobrist.side;
 	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
+	for (int sq = 0; sq < 120; sq++) {
+		if (ON_BOARD(sq)) {
+			if (boardPieceIndex[sq] != -1 && board[sq] == EMPTY) {
+				board[sq] = EMPTY;
+			}
+			else if (boardPieceIndex[sq] == -1 && board[sq] != EMPTY) {
+				boardPieceIndex[sq] = 0;
+			}
+		}
+	}
 }
 
 unsigned long long Board::getZobristKey() {
@@ -740,42 +772,40 @@ void Board::moveUnmake() {
 			bKingSq = fromSq;
 		}
 		if (prevState.move & MOVE_CASTLE_LONG_MASK) {
+			pieceListMove(toSq + EAST, toSq + 2 * WEST, ROOK, sideToMove);
 			setSq(toSq + 2 * WEST, ROOK, sideToMove);
 			clearSq(toSq + EAST);
 		}
 		else if (prevState.move & MOVE_CASTLE_SHORT_MASK) {
+			pieceListMove(toSq + WEST, toSq + EAST, ROOK, sideToMove);
 			setSq(toSq + EAST, ROOK, sideToMove);
 			clearSq(toSq + WEST);
 		}
 	}
 	if (prevState.move & MOVE_PROMOTION_MASK) {
-		if (((prevState.move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == QUEEN) {
-			materialTotal -= (pieceValues[QUEEN] - pieceValues[PAWN])*sideToMove;
-		}
-		else if (((prevState.move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == ROOK) {
-			materialTotal -= (pieceValues[ROOK] - pieceValues[PAWN])*sideToMove;
-		}
-		else if (((prevState.move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == BISHOP) {
-			materialTotal -= (pieceValues[BISHOP] - pieceValues[PAWN])*sideToMove;
-		}
-		else if (((prevState.move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) == KNIGHT) {
-			materialTotal -= (pieceValues[KNIGHT] - pieceValues[PAWN])*sideToMove;
-		}
+		Piece promotedTo = Piece(((prevState.move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT));
+		materialTotal -= (pieceValues[promotedTo] - pieceValues[PAWN]) * sideToMove;
+		pieceListRemovePiece(toSq, promotedTo, sideToMove);
+		pieceListAddPiece(toSq, PAWN, sideToMove);
 	}
+	pieceListMove(toSq, fromSq, movedPiece, sideToMove);
 	clearSq(toSq); // must clear first to remove position value of piece
 	if (prevState.move & MOVE_CAPTURE_MASK) {
 		materialTotal -= (pieceValues[attackedPiece] * sideToMove);
 		if (prevState.move & MOVE_EN_PASSANT_MASK) {
 			if ((toSq % 8) - (fromSq % 8) == WEST) {
 				setSq(fromSq + WEST, PAWN, Color(sideToMove*(-1)));
+				pieceListAddPiece(fromSq + WEST, PAWN, Color(sideToMove*(-1)));
 			}
 			else {
 				setSq(fromSq + EAST, PAWN, Color(sideToMove*(-1)));
+				pieceListAddPiece(fromSq + EAST, PAWN, Color(sideToMove*(-1)));
 			}
 			clearSq(toSq);
 		}
 		else {
 			setSq(toSq, attackedPiece, Color(sideToMove*(-1)));
+			pieceListAddPiece(toSq, attackedPiece, Color(sideToMove*(-1)));
 		}
 	}
 
@@ -791,9 +821,17 @@ void Board::moveUnmake() {
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
 
 	--repIndex;
-	//if (zobristKey != getZobristKey()) {
-	//	prevState.move.flags = 0;
-	//}
+
+	for (int sq = 0; sq < 120; sq++) {
+		if (ON_BOARD(sq)) {
+			if (boardPieceIndex[sq] != -1 && board[sq] == EMPTY) {
+				board[sq] = EMPTY;
+			}
+			else if (boardPieceIndex[sq] == -1 && board[sq] != EMPTY) {
+				boardPieceIndex[sq] = 0;
+			}
+		}
+	}
 }
 
 int Board::calculatePositionTotal() {
@@ -1063,6 +1101,28 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 	}
 	board[sq] = piece;
 	boardColor[sq] = side;
+}
+
+inline void Board::pieceListRemovePiece(int sq, Piece piece, Color side) {
+	if (boardPieceIndex[sq] != pieceLists[(side == WHITE) ? 6 + piece : piece][0]) {
+		std::swap(pieceLists[(side == WHITE) ? 6 + piece : piece][pieceLists[(side == WHITE) ? 6 + piece : piece][0]], pieceLists[(side == WHITE) ? 6 + piece : piece][boardPieceIndex[sq]]);
+		std::swap(boardPieceIndex[sq], boardPieceIndex[pieceLists[(side == WHITE) ? 6 + piece : piece][boardPieceIndex[sq]]]);
+		// to ensure no "holes" in piece list, we swap the element to be deleted with the last, and delete the last entry
+	}
+	pieceLists[(side == WHITE) ? 6 + piece : piece][boardPieceIndex[sq]] = -1;
+	pieceLists[(side == WHITE) ? 6 + piece : piece][0]--;
+	boardPieceIndex[sq] = -1;
+}
+
+inline void Board::pieceListAddPiece(int sq, Piece piece, Color side) {
+	pieceLists[(side == WHITE) ? 6 + piece : piece][++pieceLists[(side == WHITE) ? 6 + piece : piece][0]] = sq;
+	boardPieceIndex[sq] = pieceLists[(side == WHITE) ? 6 + piece : piece][0];
+}
+
+inline void Board::pieceListMove(int fromSq, int toSq, Piece piece, Color side) {
+	pieceLists[(side == WHITE) ? 6 + piece : piece][boardPieceIndex[fromSq]] = toSq;
+	boardPieceIndex[toSq] = boardPieceIndex[fromSq];
+	boardPieceIndex[fromSq] = -1;
 }
 
 
@@ -1381,10 +1441,18 @@ void Board::printBoard() {
 		}
 		sq++;
 		if (!ON_BOARD(sq)) {
+			std::cout << "\t";
+			for (int i = 8; i > 0; i--) {
+				if (boardPieceIndex[sq - i] == -1)
+					std::cout << "0";
+				else std::cout << boardPieceIndex[sq - i];
+				std::cout << " ";
+			}
 			std::cout << std::endl;
 			sq -= 24;
 		}
 	}
+	std::cout << std::endl;
 }
 
 std::string Board::getFenString() {

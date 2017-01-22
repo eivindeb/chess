@@ -33,10 +33,9 @@
 #define NOT_PV		false
 
 #define WINDOW_SIZE pieceValues[PAWN] / 2
-
 #define R	2	//reduction depth
 
-#define FIXED_SEARCH_DURATION	30*1000;
+#define FIXED_SEARCH_DURATION	10*1000;
 
 //49999991
 
@@ -51,6 +50,7 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTa
 	}
 	else {
 		mode = PROTO_NOTHING;
+		wmsLeft = -1;
 	}
 	for (int i = 0; i < 120; i++) {
 		for (int j = 0; j < 120; j++) {
@@ -63,28 +63,24 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTa
 
 int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNull, bool isPV) {
 	nodeCount++;
+	if (!(nodeCount & 4000) && (timer.timesUp || stopSearch)) {
+		return 0;
+	}
 	bool inCheck = board.inCheck(board.sideToMove);
 	if (inCheck) depthLeft++; // in check extension
 	if (depthLeft == 0) return quiescence(alpha, beta);
 
-	int moves[218];
 	int ttMove = EMPTY_MOVE;
 	int score = 0;
-	int bestMoveIndex = 0;
-	int ttVal = 0;
-	bool raisedAlpha = false;
-	//bool fPrune = false;
 
-	int newDepth = depthLeft - 1;
-
-	TT_FLAG ttFlag = TT_ALPHA;
-	if ((ttVal = tTable.probe(board.zobristKey, depthLeft, alpha, beta, &ttMove)) != INVALID) {
-		return ttVal;
+	if ((score = tTable.probe(board.zobristKey, depthLeft, alpha, beta, &ttMove)) != INVALID) {
+		if (!isPV || (score > alpha && score < beta))
+			return score;
 	}
 
 	if (depthLeft > 2 && allowNull && !(board.phaseFlag & PHASE_EG) && !isPV && !inCheck) { // null move pruning
 		board.moveMakeNull();
-		score = -alphaBeta(-beta, -beta + 1, newDepth - R, ply, !ALLOW_NULL, NOT_PV);
+		score = -alphaBeta(-beta, -beta + 1, depthLeft - 1 - R, ply, !ALLOW_NULL, NOT_PV);
 		board.moveUnmakeNull();
 		if (score >= beta) return beta;
 	}
@@ -100,6 +96,13 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 	}*/
 
 	int numOfMoves = 0;
+	bool raisedAlpha = false;
+	//bool fPrune = false;
+	int moves[218];
+	int bestMoveIndex = 0;
+	int newDepth = depthLeft - 1;
+	TT_FLAG ttFlag = TT_ALPHA;
+
 	if (inCheck) {
 		numOfMoves = board.getLegalMovesInCheck(moves);
 		if (numOfMoves == 0) {
@@ -109,10 +112,6 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 	else numOfMoves = board.getLegalMoves(moves);
 
 	sortMoves(moves, numOfMoves, ttMove, ply);
-
-	if (!(nodeCount & 4000) && (timer.timesUp || stopSearch)) {
-		return 0;
-	}
 
 	if (isRepetition()) return contempt();
 	
@@ -148,7 +147,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 					setKillers(moves[i], ply);
 					historyMoves[moves[i] & MOVE_FROM_SQ_MASK][(moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT] += depthLeft*depthLeft;
 				}
-				tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount, beta, TT_BETA, moves[i]);
+				tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount - ply, beta, TT_BETA, moves[i]);
 				return beta;
 			}
 			bestMoveIndex = i;
@@ -157,8 +156,10 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 			alpha = score;
 		}
 	}
+	if (timer.timesUp || stopSearch)
+		return alpha;
 
-	tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount, alpha, ttFlag, moves[bestMoveIndex]);
+	tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount - ply, alpha, ttFlag, moves[bestMoveIndex]);
 	return alpha;
 }
 
@@ -175,13 +176,13 @@ int Engine::quiescence(int alpha, int beta) {
 	//TODO might have to check for in check here??
 	int moves[218];
 	int score = 0;
-	int numOfCaptures = board.getCaptureMoves(moves);
+	int numOfCaptures = board.getQuiescenceMoves(moves);
 	mvvLva(moves, numOfCaptures);
 	for (int i = 0; i < numOfCaptures; i++) {
 		if (!(board.phaseFlag & PHASE_EG) && !(moves[i] & MOVE_PROMOTION_MASK) && standPat + pieceValues[(moves[i] & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] + 200 < alpha) { // delta pruning
 			continue;
 		}
-		if (SEE(((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) < 0) {
+		if ((moves[i] & MOVE_CAPTURE_MASK) && SEE(((moves[i] & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) < 0) {
 			continue;
 		}
 		board.moveMake(moves[i]);
@@ -502,9 +503,7 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 	stopSearch = false;
 	nodeCount = 0;
 	unsigned long searchLength = calculateTimeForMove(findMoveFor);
-	if (wmsLeft != -1) {
-		timer.start(true, searchLength);
-	}
+	timer.start(true, searchLength);
 	unsigned long searchStart;
 	unsigned long long lastNodeCount = 0;
 	int currDepth;
@@ -845,7 +844,7 @@ int Engine::comInput() {
 
 int Engine::comUCI(std::string command) {
 	if (command == "uci") {
-		comSend("id name c++hessDemo");
+		comSend("id name c++hess Bugged");
 		comSend("id author Eivindeb");
 		comSend("uciok");
 	}
@@ -853,6 +852,7 @@ int Engine::comUCI(std::string command) {
 		comSend("readyok");
 	}
 	else if (command == "quit") {
+		comSend("exiting");
 		exit(0);
 	}
 	else if (command == "stop") {
@@ -879,6 +879,18 @@ int Engine::comUCI(std::string command) {
 				std::string moveFrom = moveString.substr(0, 2);
 				std::string moveTo = moveString.substr(2);
 				int move = 0;
+				
+				int sqFrom = SQ_STR_TO_INT(moveFrom);
+				int sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
+				
+				if (sqFrom == (board.history[board.historyIndex].move & MOVE_FROM_SQ_MASK)  && sqTo == ((board.history[board.historyIndex].move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) {
+					comSend("ignoring my own move"); 
+					return 0; // the move the engine did so we ignore it
+				}
+
+				move = sqFrom | (sqTo << MOVE_TO_SQ_SHIFT);
+				move |= (board.board[sqFrom]) << MOVE_MOVED_PIECE_SHIFT;
+
 				if (moveTo.length() == 3) { //promotion
 					move |= (1 << MOVE_PROMOTION_SHIFT);
 					switch (moveTo.back()) {
@@ -900,15 +912,10 @@ int Engine::comUCI(std::string command) {
 						break;
 					}
 				}
-				
-				int sqFrom = SQ_STR_TO_INT(moveFrom);
-				int sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
-				
-				if (sqFrom == (board.history[board.historyIndex].move & MOVE_FROM_SQ_MASK)  && sqTo == ((board.history[board.historyIndex].move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) {
-					return 0; // the move the engine did so we ignore it
-				}
 
-				if (board.board[sqTo] != EMPTY) move |= (1 << MOVE_CAPTURE_SHIFT);
+				if (board.board[sqTo] != EMPTY)
+					move |= (1 << MOVE_CAPTURE_SHIFT);
+				move |= (board.board[sqTo] << MOVE_ATTACKED_PIECE_SHIFT);
 				if (sqTo == board.enPassant) move |= (1 << MOVE_EN_PASSANT_SHIFT);
 
 				if (board.board[sqFrom] == KING && abs(sqFrom - sqTo) == 2) {
@@ -919,6 +926,13 @@ int Engine::comUCI(std::string command) {
 						move |= (1 << MOVE_CASTLE_SHORT_SHIFT);
 					}
 				}
+
+
+				std::stringstream moveStream;
+				//moveStream << "received move " << SQ_FILE((move & MOVE_FROM_SQ_MASK)) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT));
+				comSend(moveStream.str());
+				//comSend("Move value " + std::to_string(move));
+				board.printMove(move);
 
 				board.moveMake(move);
 			}
@@ -961,7 +975,23 @@ int Engine::comUCI(std::string command) {
 			}
 			move = iterativeDeepening(moves, numOfMoves);
 
-			moveStream << "bestmove " << SQ_FILE(move & MOVE_FROM_SQ_MASK) << SQ_RANK(move & MOVE_FROM_SQ_MASK) << SQ_FILE((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT) << SQ_RANK((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT);
+			moveStream << "bestmove " << SQ_FILE((move & MOVE_FROM_SQ_MASK)) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT));
+			if (move & MOVE_PROMOTION_MASK) {
+				switch ((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) {
+					case QUEEN:
+						moveStream << "q";
+						break;
+					case ROOK:
+						moveStream << "r";
+						break;
+					case BISHOP:
+						moveStream << "b";
+						break;
+					case KNIGHT:
+						moveStream << "n";
+						break;
+				}
+			}
 			comSend(moveStream.str());
 			board.moveMake(move);
 		}

@@ -52,7 +52,6 @@
 
 #define MATE_SCORE		300000
 #define INVALID			2147483647
-#define ENTRY_LIFE		10
 #define NO_ID			255
 
 
