@@ -13,7 +13,7 @@
 
 int main()
 {	
-	Engine myengine = Engine(1, 20, "", true);
+	Engine myengine = Engine(1, 6, "", true);
 	/*Move moves[218];
 	int numOfMoves;
 	int index;
@@ -28,10 +28,15 @@ int main()
 	int moveIndex = 0;
 	int move;
 	myengine.board.printBoard();
+	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+	myengine.perft(6);
+	std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+	std::cout << duration << std::endl;
 	//std::cout << "Best was: " << myengine.miniMax(3);
 	
 
-	while (1) {
+	/*while (1) {
 		if (myengine.board.inCheck(myengine.board.sideToMove)) {
 			numOfMoves = myengine.board.getLegalMovesInCheck(moves);
 			if (numOfMoves == 0) break;
@@ -57,7 +62,7 @@ int main()
 			std::cout << "Move played: " << SQ_FILE(move & MOVE_FROM_SQ_MASK) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << std::endl;
 			myengine.board.printBoard();
 		}
-	}
+	}*/
 	std::string side = (myengine.board.sideToMove == WHITE) ? "Black" : "White";
 	std::cout << side << " won in " << myengine.board.halfMoveCount / 2 << " moves!" << std::endl;
 	std::cin.get();

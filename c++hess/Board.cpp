@@ -247,80 +247,79 @@ int Board::getLegalMoves(int *moves) {
 		}
 	}
 
-	for (int sq = 0; sq < 120; sq++) {
-		if (ON_BOARD(sq)) {
-			if (board[sq] != EMPTY && boardColor[sq] == sideToMove) {  // a players piece on this square
-				if (board[sq] <= 2) {  // TODO might have to check for out of bounds here but i dont think it is necessary (a pawn should never be able to move out of bounds)
-					if (board[sq] == PAWN) {
-						int dirMod = (sideToMove == WHITE) ? 0 : 4;
-						if ((sideToMove == WHITE && (sq >> 4) == 1) || (sideToMove == BLACK && (sq >> 4) == 6)) {
-							if (board[sq + pieceDeltas[PAWN][dirMod + 3]] == EMPTY && board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, 0);
-							}
-						}
-						if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod]) && boardColor[sq + pieceDeltas[PAWN][dirMod]] == (sideToMove*(-1))) {
-							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], board[sq + pieceDeltas[PAWN][dirMod]], 1);
-							}
-							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[sq + pieceDeltas[PAWN][dirMod]], 1);
-							}
-						}
-						if (board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
-							if ((sideToMove == WHITE && (sq >> 4) == 6) || (sideToMove == BLACK && (sq >> 4) == 1)) {
-								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 1], board[sq + pieceDeltas[PAWN][dirMod + 1]], 0);
-							}
-							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 1]], 0);
-							}
-						}
-						if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod + 2]) && boardColor[sq + pieceDeltas[PAWN][dirMod + 2]] == (sideToMove*(-1))) {
-							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
-							}
-							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
-							}
-						}
-						if (enPassant != -1) {
-							if ((sq + pieceDeltas[PAWN][dirMod]) == enPassant) {
-								moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, 1);
-								moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
-							}
-							else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
-								moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, 1);
-								moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
-							}
+	for (int pieceType = 0; pieceType < 6; pieceType++) {
+		for (int pieceIndex = 1; pieceIndex <= pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+			int sq = pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
+			if (pieceType <= 2) {
+				if (pieceType == PAWN) {
+					int dirMod = (sideToMove == WHITE) ? 0 : 4;
+					if ((sideToMove == WHITE && (sq >> 4) == 1) || (sideToMove == BLACK && (sq >> 4) == 6)) {
+						if (board[sq + pieceDeltas[PAWN][dirMod + 3]] == EMPTY && board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
+							moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, 0);
 						}
 					}
-					else { // non sliding piece
-						for (int dir = 0; dir < 8; dir++) {
-							newPos = sq + pieceDeltas[board[sq]][dir];
-							if (ON_BOARD(newPos)) {
-								if (boardColor[newPos] == sideToMove*(-1)) {
-									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
-								}
-								else if (board[newPos] == EMPTY) {
-									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], EMPTY, 0);
-								}
-							}
+					if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod]) && boardColor[sq + pieceDeltas[PAWN][dirMod]] == (sideToMove*(-1))) {
+						if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
+							movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], board[sq + pieceDeltas[PAWN][dirMod]], 1);
+						}
+						else {
+							moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[sq + pieceDeltas[PAWN][dirMod]], 1);
 						}
 					}
-
+					if (board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
+						if ((sideToMove == WHITE && (sq >> 4) == 6) || (sideToMove == BLACK && (sq >> 4) == 1)) {
+							movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 1], board[sq + pieceDeltas[PAWN][dirMod + 1]], 0);
+						}
+						else {
+							moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 1]], 0);
+						}
+					}
+					if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod + 2]) && boardColor[sq + pieceDeltas[PAWN][dirMod + 2]] == (sideToMove*(-1))) {
+						if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
+							movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
+						}
+						else {
+							moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
+						}
+					}
+					if (enPassant != -1) {
+						if ((sq + pieceDeltas[PAWN][dirMod]) == enPassant) {
+							moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, 1);
+							moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
+						}
+						else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
+							moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, 1);
+							moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
+						}
+					}
 				}
-				else {
+				else { // non sliding piece
 					for (int dir = 0; dir < 8; dir++) {
-						if (pieceDeltas[board[sq]][dir] == 0) break;
-						newPos = sq;
-						while (((newPos += pieceDeltas[board[sq]][dir]) & 0x88) == 0) {
-							if (board[newPos] != EMPTY) {
-								if (boardColor[newPos] == sideToMove*(-1)) {
-									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
-								}
-								break;
+						newPos = sq + pieceDeltas[board[sq]][dir];
+						if (ON_BOARD(newPos)) {
+							if (boardColor[newPos] == sideToMove*(-1)) {
+								moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
 							}
-							moveAdd(moves, movesInPosition++, sq, newPos, board[sq], EMPTY, 0);
+							else if (board[newPos] == EMPTY) {
+								moveAdd(moves, movesInPosition++, sq, newPos, board[sq], EMPTY, 0);
+							}
 						}
+					}
+				}
+
+			}
+			else {
+				for (int dir = 0; dir < 8; dir++) {
+					if (pieceDeltas[board[sq]][dir] == 0) break;
+					newPos = sq;
+					while (((newPos += pieceDeltas[board[sq]][dir]) & 0x88) == 0) {
+						if (board[newPos] != EMPTY) {
+							if (boardColor[newPos] == sideToMove*(-1)) {
+								moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
+							}
+							break;
+						}
+						moveAdd(moves, movesInPosition++, sq, newPos, board[sq], EMPTY, 0);
 					}
 				}
 			}
@@ -371,91 +370,89 @@ int Board::getLegalMovesInCheck(int *moves) {
 
 		// TODO can figure out directions there is no reason to search in, e.g. North and South if king is directly south of attacking piece
 		// instead of checking if in legalSquares, i can check if it is between kingSq and attackerSq and is a multiple of the direction i.e. ( sq > kingSq and sq <= attackerSq and sq % dir == 0)
+		for (int pieceType = 1; pieceType < 6; pieceType++) {
+			for (int pieceIndex = 1; pieceIndex <= pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+				int sq = pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
+				if (pieceType == PAWN) {
+					int dirMod = (sideToMove == WHITE) ? 0 : 4;
+					if (numOfLegalSquares > 1) {
+						if (((sideToMove == WHITE && sq / 16 == 1) || (sideToMove == BLACK && sq / 16 == 6)) && board[(sq + pieceDeltas[PAWN][dirMod + 1])] == EMPTY) {
+							if (std::any_of(legalSquares, legalSquares + numOfLegalSquares - 1, [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 3]; })) {
+								moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, 0);
+							}
+						}
+						if (std::any_of((legalSquares), legalSquares + numOfLegalSquares - 1, [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 1]; })) {
+							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
+								numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod + 1], EMPTY, 0);
+							}
+							else {
+								moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, EMPTY, 0);
+							}
+						}
+					}
 
-		for (int sq = 0; sq < 120; sq++) {
-			if (ON_BOARD(sq)) {
-				if (boardColor[sq] == sideToMove && sq != kingSq && !sqIsAttacked(kingSq, Color(sideToMove*(-1)), sq, attackers[0])) {
-					if (board[sq] == PAWN) {
-						int dirMod = (sideToMove == WHITE) ? 0 : 4;
-						if (numOfLegalSquares > 1) {
-							if (((sideToMove == WHITE && sq / 16 == 1) || (sideToMove == BLACK && sq / 16 == 6)) && board[(sq + pieceDeltas[PAWN][dirMod + 1])] == EMPTY) {
-								if (std::any_of(legalSquares, legalSquares + numOfLegalSquares - 1, [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 3]; })) {
-									moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 3], PAWN, EMPTY, 0);
-								}
-							}
-							if (std::any_of((legalSquares), legalSquares + numOfLegalSquares - 1, [=](int i) {return i == sq + pieceDeltas[PAWN][dirMod + 1]; })) {
-								if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-									numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod + 1], EMPTY, 0);
-								}
-								else {
-									moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[PAWN][dirMod + 1], PAWN, EMPTY, 0);
-								}	
-							}
-						}
-						
-						if (sq + pieceDeltas[PAWN][dirMod] == attackers[0]) {
-							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, attackers[0], board[attackers[0]], 1);
-							}
-							else {
-								moveAdd(moves, numOfMoves++, sq, attackers[0], PAWN, board[attackers[0]], 1);
-							}
-						}
-						else if (sq + pieceDeltas[PAWN][dirMod + 2] == attackers[0]) {
-							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, attackers[0], board[attackers[0]], 1);
-							}
-							else {
-								moveAdd(moves, numOfMoves++, sq, attackers[0], PAWN, board[attackers[0]], 1);
-							}
-						}
-						else if (enPassant != -1 && (board[attackers[0]] == PAWN || std::any_of(legalSquares, legalSquares + numOfLegalSquares, [=](int i) {return i == enPassant; }))) {
-							if (sq + pieceDeltas[PAWN][dirMod] == enPassant) {
-								moveAdd(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[attackers[0]], 0);
-								moves[numOfMoves++] |= (1 << MOVE_EN_PASSANT_SHIFT);
-							}
-							else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
-								moveAdd(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[attackers[0]], 1);
-								moves[numOfMoves++] |= (1 << MOVE_EN_PASSANT_SHIFT);
-							}
-						}
-						continue;
-					}
-					canReachLegalSquare = false;
-					for (int i = 0; i < numOfLegalSquares; i++) {
-						if (boardColor[sq] == sideToMove && (attackArray[legalSquares[i] - sq + 128] & attackGroups[board[sq]])) {
-							canReachLegalSquare = true;
-							break;
-						}
-					}
-					if (canReachLegalSquare) {
-						if (board[sq] <= 2) {
-							for (int dir = 0; dir < 8; dir++) {
-								if (std::any_of(legalSquares, legalSquares + numOfLegalSquares, [=](int i) {return i == sq + pieceDeltas[board[sq]][dir]; })) {
-									if (sq + pieceDeltas[board[sq]][dir] == attackers[0]) {
-										moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[board[sq]][dir], board[sq], board[attackers[0]], 1);
-									}
-									else {
-										moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[board[sq]][dir], board[sq], EMPTY, 0);
-									}
-								}
-							}
+					if (sq + pieceDeltas[PAWN][dirMod] == attackers[0]) {
+						if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
+							numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, attackers[0], board[attackers[0]], 1);
 						}
 						else {
-							for (int dir = 0; dir < 8; dir++) {
-								newPos = sq;
-								while (((newPos += pieceDeltas[board[sq]][dir]) & 0x88) == 0) {
-									if (std::any_of(legalSquares, legalSquares + numOfLegalSquares, [=](int i) {return i == newPos; })) {
-										if (newPos == attackers[0]) {
-											moveAdd(moves, numOfMoves++, sq, newPos, board[sq], board[newPos], 1);
-										}
-										else {
-											moveAdd(moves, numOfMoves++, sq, newPos, board[sq], EMPTY, 0);
-										}
+							moveAdd(moves, numOfMoves++, sq, attackers[0], PAWN, board[attackers[0]], 1);
+						}
+					}
+					else if (sq + pieceDeltas[PAWN][dirMod + 2] == attackers[0]) {
+						if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
+							numOfMoves = addPromotionPermutations(moves, numOfMoves, sq, attackers[0], board[attackers[0]], 1);
+						}
+						else {
+							moveAdd(moves, numOfMoves++, sq, attackers[0], PAWN, board[attackers[0]], 1);
+						}
+					}
+					else if (enPassant != -1 && (board[attackers[0]] == PAWN || std::any_of(legalSquares, legalSquares + numOfLegalSquares, [=](int i) {return i == enPassant; }))) {
+						if (sq + pieceDeltas[PAWN][dirMod] == enPassant) {
+							moveAdd(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[attackers[0]], 0);
+							moves[numOfMoves++] |= (1 << MOVE_EN_PASSANT_SHIFT);
+						}
+						else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
+							moveAdd(moves, numOfMoves, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[attackers[0]], 1);
+							moves[numOfMoves++] |= (1 << MOVE_EN_PASSANT_SHIFT);
+						}
+					}
+					continue;
+				}
+				canReachLegalSquare = false;
+				for (int i = 0; i < numOfLegalSquares; i++) {
+					if (boardColor[sq] == sideToMove && (attackArray[legalSquares[i] - sq + 128] & attackGroups[board[sq]])) {
+						canReachLegalSquare = true;
+						break;
+					}
+				}
+				if (canReachLegalSquare) {
+					if (pieceType <= 2) {
+						for (int dir = 0; dir < 8; dir++) {
+							if (std::any_of(legalSquares, legalSquares + numOfLegalSquares, [=](int i) {return i == sq + pieceDeltas[board[sq]][dir]; })) {
+								if (sq + pieceDeltas[board[sq]][dir] == attackers[0]) {
+									moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[board[sq]][dir], board[sq], board[attackers[0]], 1);
+								}
+								else {
+									moveAdd(moves, numOfMoves++, sq, sq + pieceDeltas[board[sq]][dir], board[sq], EMPTY, 0);
+								}
+							}
+						}
+					}
+					else {
+						for (int dir = 0; dir < 8; dir++) {
+							newPos = sq;
+							while (((newPos += pieceDeltas[board[sq]][dir]) & 0x88) == 0) {
+								if (std::any_of(legalSquares, legalSquares + numOfLegalSquares, [=](int i) {return i == newPos; })) {
+									if (newPos == attackers[0]) {
+										moveAdd(moves, numOfMoves++, sq, newPos, board[sq], board[newPos], 1);
 									}
-									if (board[newPos] != EMPTY) {
-										break;
+									else {
+										moveAdd(moves, numOfMoves++, sq, newPos, board[sq], EMPTY, 0);
 									}
+								}
+								if (board[newPos] != EMPTY) {
+									break;
 								}
 							}
 						}
@@ -483,67 +480,65 @@ int Board::getQuiescenceMoves(int *moves) {
 	int movesInPosition = 0;
 	int newPos;
 
-	for (int sq = 0; sq < 120; sq++) {
-		if (ON_BOARD(sq)) {
-			if (board[sq] != EMPTY && boardColor[sq] == sideToMove) {  // a players piece on this square
-				if (board[sq] <= 2) {
-					if (board[sq] == PAWN) {
-						int dirMod = (sideToMove == WHITE) ? 0 : 4;
+	for (int pieceType = 0; pieceType < 6; pieceType++) {
+		for (int pieceIndex = 1; pieceIndex <= pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+			int sq = pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
+			if (pieceType <= 2) {
+				if (pieceType == PAWN) {
+					int dirMod = (sideToMove == WHITE) ? 0 : 4;
+					if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
+						if (board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
+							movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 1], EMPTY, 0);
+						}
+					}
+					if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod]) && boardColor[sq + pieceDeltas[PAWN][dirMod]] == (sideToMove*(-1))) {
 						if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-							if (board[sq + pieceDeltas[PAWN][dirMod + 1]] == EMPTY) {
-								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 1], EMPTY, 0);
-							}
+							movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], board[sq + pieceDeltas[PAWN][dirMod]], 1);
 						}
-						if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod]) && boardColor[sq + pieceDeltas[PAWN][dirMod]] == (sideToMove*(-1))) {
-							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], board[sq + pieceDeltas[PAWN][dirMod]], 1);
-							}
-							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[sq + pieceDeltas[PAWN][dirMod]], 1);
-							}
-						}
-						if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod + 2]) && boardColor[sq + pieceDeltas[PAWN][dirMod + 2]] == (sideToMove*(-1))) {
-							if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
-								movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
-							}
-							else {
-								moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
-							}
-						}
-						if (enPassant != -1) {
-							if ((sq + pieceDeltas[PAWN][dirMod]) == enPassant) {
-								moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, 1);
-								moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
-							}
-							else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
-								moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, 1);
-								moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
-							}
+						else {
+							moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, board[sq + pieceDeltas[PAWN][dirMod]], 1);
 						}
 					}
-					else { // non sliding piece
-						for (int dir = 0; dir < 8; dir++) {
-							newPos = sq + pieceDeltas[board[sq]][dir];
-							if (ON_BOARD(newPos)) {
-								if (boardColor[newPos] == sideToMove*(-1)) {
-									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
-								}
-							}
+					if (ON_BOARD(sq + pieceDeltas[PAWN][dirMod + 2]) && boardColor[sq + pieceDeltas[PAWN][dirMod + 2]] == (sideToMove*(-1))) {
+						if ((sideToMove == WHITE && sq / 16 == 6) || (sideToMove == BLACK && sq / 16 == 1)) {
+							movesInPosition = addPromotionPermutations(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
+						}
+						else {
+							moveAdd(moves, movesInPosition++, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, board[sq + pieceDeltas[PAWN][dirMod + 2]], 1);
 						}
 					}
-
+					if (enPassant != -1) {
+						if ((sq + pieceDeltas[PAWN][dirMod]) == enPassant) {
+							moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod], PAWN, PAWN, 1);
+							moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
+						}
+						else if (sq + pieceDeltas[PAWN][dirMod + 2] == enPassant) {
+							moveAdd(moves, movesInPosition, sq, sq + pieceDeltas[PAWN][dirMod + 2], PAWN, PAWN, 1);
+							moves[movesInPosition++] |= (1 << MOVE_EN_PASSANT_SHIFT);
+						}
+					}
 				}
 				else {
 					for (int dir = 0; dir < 8; dir++) {
-						if (pieceDeltas[board[sq]][dir] == 0) break;
-						newPos = sq;
-						while (((newPos += pieceDeltas[board[sq]][dir]) & 0x88) == 0) {
-							if (board[newPos] != EMPTY) {
-								if (boardColor[newPos] == sideToMove*(-1)) {
-									moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
-								}
-								break;
+						newPos = sq + pieceDeltas[board[sq]][dir];
+						if (ON_BOARD(newPos)) {
+							if (boardColor[newPos] == sideToMove*(-1)) {
+								moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
 							}
+						}
+					}
+				}
+			}
+			else {
+				for (int dir = 0; dir < 8; dir++) {
+					if (pieceDeltas[board[sq]][dir] == 0) break;
+					newPos = sq;
+					while (((newPos += pieceDeltas[board[sq]][dir]) & 0x88) == 0) {
+						if (board[newPos] != EMPTY) {
+							if (boardColor[newPos] == sideToMove*(-1)) {
+								moveAdd(moves, movesInPosition++, sq, newPos, board[sq], board[newPos], 1);
+							}
+							break;
 						}
 					}
 				}
@@ -1235,31 +1230,34 @@ bool Board::sqIsAttacked(int chkdSq, Color attackColor, int xRaySq, int ignoreAt
 		board[xRaySq] = EMPTY;
 		boardColor[xRaySq] = NONE;
 	}
-	for (int sq = 0; sq < 120; sq++) {
-		if (ON_BOARD(sq) && sq != chkdSq && board[sq] != EMPTY && (boardColor[sq] == attackColor) && sq != ignoreAttackerOnSq) {
-			lookupVal = chkdSq - sq + 128;
-			if (board[sq] == PAWN) {
-				int attackGroup = (boardColor[sq] == WHITE) ? attackGroups[PAWN] - 8 : attackGroups[PAWN] - 4;
-				if (attackGroup & attackArray[lookupVal]) {
-					isAttacked = true;
-					break;
+	for (int pieceType = 0; pieceType < 6; pieceType++) {
+		for (int pieceIndex = 1; pieceIndex <= pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+			int sq = pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
+			if (sq != chkdSq && sq != ignoreAttackerOnSq) {
+				lookupVal = chkdSq - sq + 128;
+				if (pieceType == PAWN) {
+					int attackGroup = (attackColor == WHITE) ? attackGroups[PAWN] - 8 : attackGroups[PAWN] - 4;
+					if (attackGroup & attackArray[lookupVal]) {
+						isAttacked = true;
+						break;
+					}
 				}
-			}
-			else {
-				if (attackGroups[board[sq]] & attackArray[lookupVal]) { // piece can attack sq
-					if (board[sq] <= 2) {
-						isAttacked = true;
-						break;
-					}
-					newPos = chkdSq;
-					while ((newPos += dirBySquareDiff[chkdSq - sq + 119]) != sq) {
-						if (board[newPos] != EMPTY) {
-							break;						// TODO maybe use goto for efficiency
+				else {
+					if (attackGroups[pieceType] & attackArray[lookupVal]) { // piece can attack sq
+						if (pieceType <= 2) {
+							isAttacked = true;
+							break;
 						}
-					}
-					if (newPos == sq) {
-						isAttacked = true;
-						break;
+						newPos = chkdSq;
+						while ((newPos += dirBySquareDiff[chkdSq - sq + 119]) != sq) {
+							if (board[newPos] != EMPTY) {
+								break;						// TODO maybe use goto for efficiency
+							}
+						}
+						if (newPos == sq) {
+							isAttacked = true;
+							break;
+						}
 					}
 				}
 			}
@@ -1277,26 +1275,29 @@ int Board::getSqAttackers(int *attackingSquares, int chkdSq, Color attackColor) 
 	int numOfAttackers = 0;
 	int lookupVal;
 	int newPos;
-	for (int sq = 0; sq < 120; sq++) {
-		if (sq != chkdSq && ON_BOARD(sq) && (boardColor[sq] == attackColor)) {
-			lookupVal = chkdSq - sq + 128;
-			if (board[sq] == PAWN) {
-				int attackGroup = (boardColor[sq] == WHITE) ? attackGroups[PAWN] - 8 : attackGroups[PAWN] - 4;
-				if (attackGroup & attackArray[lookupVal]) attackingSquares[numOfAttackers++] = sq;
-			}
-			else {
-				if (attackArray[lookupVal] & attackGroups[board[sq]]) { // piece can attack sq
-					if (board[sq] <= 2) {
-						attackingSquares[numOfAttackers++] = sq;
-						continue;
-					}
-					newPos = chkdSq;
-					while ((newPos += dirBySquareDiff[chkdSq - sq + 119]) != sq) {
-						if (board[newPos] != EMPTY) {
-							break;						// TODO maybe use goto for efficiency
+	for (int pieceType = 0; pieceType < 6; pieceType++) {
+		for (int pieceIndex = 1; pieceIndex <= pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+			int sq = pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
+			if (sq != chkdSq) {
+				lookupVal = chkdSq - sq + 128;
+				if (pieceType == PAWN) {
+					int attackGroup = (attackColor == WHITE) ? attackGroups[PAWN] - 8 : attackGroups[PAWN] - 4;
+					if (attackGroup & attackArray[lookupVal]) attackingSquares[numOfAttackers++] = sq;
+				}
+				else {
+					if (attackArray[lookupVal] & attackGroups[pieceType]) { // piece can attack sq
+						if (pieceType <= 2) {
+							attackingSquares[numOfAttackers++] = sq;
+							continue;
 						}
+						newPos = chkdSq;
+						while ((newPos += dirBySquareDiff[chkdSq - sq + 119]) != sq) {
+							if (board[newPos] != EMPTY) {
+								break;						// TODO maybe use goto for efficiency
+							}
+						}
+						if (newPos == sq) attackingSquares[numOfAttackers++] = sq;
 					}
-					if (newPos == sq) attackingSquares[numOfAttackers++] = sq;
 				}
 			}
 		}
