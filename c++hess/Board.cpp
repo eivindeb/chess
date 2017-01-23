@@ -713,16 +713,6 @@ void Board::moveMake(int move) { // TODO maybe consider writing captured piece h
 	zobristKey ^= zobrist.side;
 	zobristKey ^= zobrist.wCastlingRights[wCastlingRights];
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
-	for (int sq = 0; sq < 120; sq++) {
-		if (ON_BOARD(sq)) {
-			if (boardPieceIndex[sq] != -1 && board[sq] == EMPTY) {
-				board[sq] = EMPTY;
-			}
-			else if (boardPieceIndex[sq] == -1 && board[sq] != EMPTY) {
-				boardPieceIndex[sq] = 0;
-			}
-		}
-	}
 }
 
 unsigned long long Board::getZobristKey() {
@@ -816,17 +806,6 @@ void Board::moveUnmake() {
 	zobristKey ^= zobrist.bCastlingRights[bCastlingRights];
 
 	--repIndex;
-
-	for (int sq = 0; sq < 120; sq++) {
-		if (ON_BOARD(sq)) {
-			if (boardPieceIndex[sq] != -1 && board[sq] == EMPTY) {
-				board[sq] = EMPTY;
-			}
-			else if (boardPieceIndex[sq] == -1 && board[sq] != EMPTY) {
-				boardPieceIndex[sq] = 0;
-			}
-		}
-	}
 }
 
 int Board::calculatePositionTotal() {

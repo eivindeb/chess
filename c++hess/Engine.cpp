@@ -14,8 +14,8 @@
 #define HASH_ORDER		10000000
 #define CPT_ORDER		5000
 #define PROMOTION_ORDER	5000
-#define KILLER_ORDER	1000
-#define SEE_ORDER_DEPTH	-1
+#define KILLER_ORDER	3000
+#define SEE_ORDER_DEPTH	5
 
 #define EMPTY_MOVE		-1
 
@@ -35,7 +35,7 @@
 #define WINDOW_SIZE pieceValues[PAWN] / 2
 #define R	2	//reduction depth
 
-#define FIXED_SEARCH_DURATION	10*1000;
+#define FIXED_SEARCH_DURATION	30*1000;
 
 //49999991
 
@@ -57,8 +57,8 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTa
 			historyMoves[i][j] = 0;
 		}
 	}
-	wmsLeft = 0;
-	bmsLeft = 0;
+	//wmsLeft = 0;
+	//bmsLeft = 0;
 };
 
 int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNull, bool isPV) {
@@ -68,7 +68,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 	}
 	bool inCheck = board.inCheck(board.sideToMove);
 	if (inCheck) depthLeft++; // in check extension
-	if (depthLeft == 0) return quiescence(alpha, beta);
+	if (depthLeft <= 0) return quiescence(alpha, beta);
 
 	int ttMove = EMPTY_MOVE;
 	int score = 0;
@@ -85,7 +85,9 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 		if (score >= beta) return beta;
 	}
 
-	/*if (depthLeft == 1 && !inCheck && (evaluatePosition() + pieceValues[BISHOP]) < alpha) { // futility pruning, TODO: stop pruning close to mate value
+	bool fPrune = false;
+
+	if (depthLeft == 1 && !inCheck && (evaluatePosition() + pieceValues[BISHOP]) < alpha) { // futility pruning, TODO: stop pruning close to mate value
 		fPrune = true;
 	}
 	else if (depthLeft == 2 && !inCheck && (evaluatePosition() + pieceValues[ROOK]) < alpha) {
@@ -93,11 +95,10 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 	}
 	else if (depthLeft == 3 && !inCheck && (evaluatePosition() + pieceValues[QUEEN]) < alpha) {
 		fPrune = true;
-	}*/
+	}
 
 	int numOfMoves = 0;
 	bool raisedAlpha = false;
-	//bool fPrune = false;
 	int moves[218];
 	int bestMoveIndex = 0;
 	int newDepth = depthLeft - 1;
@@ -123,14 +124,14 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 		}
 		newDepth = depthLeft - 1;
 
-		if (i >= 4 && !isPV && depthLeft >= 3 && !(moves[i] & MOVE_CAPTURE_MASK) && !(moves[i] & MOVE_PROMOTION_MASK) && !(board.inCheck(board.sideToMove))) {
+		if (i >= 4 && !isPV && depthLeft >= 3 && !(moves[i] & MOVE_CAPTURE_MASK) && !(moves[i] & MOVE_PROMOTION_MASK) && !(board.inCheck(board.sideToMove))) { // LMR
 			newDepth--;
 		}
 
-		/*if (fPrune && !(moves[i] & MOVE_CAPTURE_MASK) && !(moves[i] & MOVE_PROMOTION_MASK) && !(board.inCheck(board.sideToMove))) { // futility pruning
+		if (fPrune && !(moves[i] & MOVE_CAPTURE_MASK) && !(moves[i] & MOVE_PROMOTION_MASK) && !(board.inCheck(board.sideToMove))) { // futility pruning
 			board.moveUnmake();
 			continue;
-		}*/
+		}
 
 		if (!raisedAlpha) { // principal variation search
 			score = -alphaBeta(-beta, -alpha, newDepth, ply + 1, ALLOW_NULL, isPV);
@@ -729,7 +730,8 @@ void Engine::infoPV(int searchDepth, int score) {
 			pvSS << "info depth " << searchDepth << " pv ";
 			break;
 	}
-	for (int j = 0; j < searchDepth; j++) {
+	int j;
+	for (j = 0; j < searchDepth; j++) {
 		if (!(lastMoveFlag = tTable.getPV(board.zobristKey, &pvMove))) {
 			break;
 		}
@@ -741,14 +743,20 @@ void Engine::infoPV(int searchDepth, int score) {
 		//}
 	}
 	if (score == INVALID) {
-		switch (mode) {
-		case PROTO_NOTHING:
-			pvString = std::to_string(evaluatePosition()*board.sideToMove) + "\t" + pvSS.str();
-			break;
-		case PROTO_UCI:
-			pvSS << "score cp " << evaluatePosition()*board.sideToMove;
-			break;
+		if (j == searchDepth) {
+			switch (mode) {
+			case PROTO_NOTHING:
+				pvString = std::to_string(evaluatePosition()*board.sideToMove) + "\t" + pvSS.str();
+				break;
+			case PROTO_UCI:
+				pvSS << "score cp " << evaluatePosition()*board.sideToMove;
+				break;
+			}
 		}
+		else if (mode == PROTO_NOTHING) {
+			pvString = "N/A\t" + pvSS.str();
+		}
+		
 	}
 	else if (mode == PROTO_UCI) {
 		pvSS << "score cp " << score;
