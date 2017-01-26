@@ -53,8 +53,7 @@
 #define MATE_SCORE		300000
 #define INVALID			2147483647
 #define NO_ID			255
-
-
+#define COUNT			0
 
 enum Piece : uint8_t { KING, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY };
 enum Color : int8_t { WHITE = 1, BLACK = -1, NONE = 0 };
@@ -387,6 +386,9 @@ static int PSTbKingEG[120] = {
 	-72, -48, -36, -24, -24, -36, -48, -72							//112-119
 };
 
+static int knightPawnCountEval[9] = { -20, -16, -12, -8, -4,  0,  4,  8, 12 };
+static int rookPawnCountEval[9] = { 15,  12,   9,  6,  3,  0, -3, -6, -9 };
+
 
 struct Move {
 	uint8_t fromSq;
@@ -411,6 +413,11 @@ struct Zobrist {
 	unsigned long long wCastlingRights[4]; // 0 (NONE), CASTLE_SHORT, CASTLE_LONG, , CASTLE_BOTH
 	unsigned long long bCastlingRights[4];
 	unsigned long long enPassant[8];
+};
+
+struct EvalEntry {
+	unsigned long long zobristKey;
+	int score;
 };
 
 struct TranspositionEntry {

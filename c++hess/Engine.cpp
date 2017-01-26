@@ -33,23 +33,23 @@
 #define NOT_PV		false
 
 #define WINDOW_SIZE pieceValues[PAWN] / 2
+#define TEMPO		pieceValues[PAWN] / 2
+
 #define R	2	//reduction depth
 
 #define FIXED_SEARCH_DURATION	30*1000;
 
 //49999991
 
-Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(4194311), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
+Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(4194311), evalTable(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
 	if (!console) {
 		comInit();
 		std::thread t1 = std::thread([this] {this->comReceive(); });
 		t1.detach();
-		mode = PROTO_UCI;
 	}
 	else {
-		mode = PROTO_NOTHING;
 		wmsLeft = -1;
 	}
 	for (int i = 0; i < 120; i++) {
@@ -102,7 +102,9 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 	int moves[218];
 	int bestMoveIndex = 0;
 	int newDepth = depthLeft - 1;
+	int reductionDepth;
 	TT_FLAG ttFlag = TT_ALPHA;
+	bool legalMove = false;
 
 	if (inCheck) {
 		numOfMoves = board.getLegalMovesInCheck(moves);
@@ -122,25 +124,31 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 			board.moveUnmake();
 			continue;
 		}
+		reductionDepth = 0;
 		newDepth = depthLeft - 1;
+		legalMove = true;
 
 		if (i >= 4 && !isPV && depthLeft >= 3 && !(moves[i] & MOVE_CAPTURE_MASK) && !(moves[i] & MOVE_PROMOTION_MASK) && !(board.inCheck(board.sideToMove))) { // LMR
-			newDepth--;
+			reductionDepth = 1;
+			newDepth -= reductionDepth;
 		}
 
-		if (fPrune && !(moves[i] & MOVE_CAPTURE_MASK) && !(moves[i] & MOVE_PROMOTION_MASK) && !(board.inCheck(board.sideToMove))) { // futility pruning
+		if (fPrune && legalMove && !(moves[i] & MOVE_CAPTURE_MASK) && !(moves[i] & MOVE_PROMOTION_MASK) && !(board.inCheck(board.sideToMove))) { // futility pruning
 			board.moveUnmake();
 			continue;
 		}
 
-		if (!raisedAlpha) { // principal variation search
-			score = -alphaBeta(-beta, -alpha, newDepth, ply + 1, ALLOW_NULL, isPV);
-		}
-		else {
-			if (-alphaBeta(-alpha - 1, -alpha, newDepth, ply + 1, ALLOW_NULL, NOT_PV) > alpha) {
-				score = -alphaBeta(-beta, -alpha, newDepth, ply + 1, ALLOW_NULL, IS_PV);
+		do { // research with full depth if reduced search actually improves over alpha.
+			if (!raisedAlpha) { // principal variation search
+				score = -alphaBeta(-beta, -alpha, newDepth, ply + 1, ALLOW_NULL, isPV);
 			}
-		}
+			else {
+				if (-alphaBeta(-alpha - 1, -alpha, newDepth, ply + 1, ALLOW_NULL, NOT_PV) > alpha) {
+					score = -alphaBeta(-beta, -alpha, newDepth, ply + 1, ALLOW_NULL, IS_PV);
+				}
+			}
+		} while (score > alpha && reductionDepth && (newDepth += reductionDepth) && (reductionDepth = 0));
+		
 		board.moveUnmake();
 		if (score > alpha) {
 			if (score >= beta) {
@@ -313,6 +321,10 @@ inline void Engine::mvvLva(int *moves, int numOfMoves) {
 }
 
 int Engine::evaluatePosition() {
+	int score;
+	if ((score = evalTable.probe(board.zobristKey)) != INVALID) {
+		return score;
+	}
 	int moves[218];
 	int wNumOfMoves;
 	int bNumOfMoves;
@@ -326,16 +338,22 @@ int Engine::evaluatePosition() {
 		board.sideToMove = Color(board.sideToMove*(-1));
 		wNumOfMoves = board.getLegalMoves(moves);
 	}
-	board.sideToMove = Color(board.sideToMove*(-1));
-	int score = board.materialTotal + mobilityWeight * (wNumOfMoves - bNumOfMoves) + board.positionTotal;
-	if (board.pieceCount[BISHOP + WHITE * 6 + 6] == 2) {
+	board.sideToMove = Color(board.sideToMove*(-1)); // mobility slows down evaluation A LOT.
+	score = board.materialTotal + board.positionTotal + mobilityWeight * (wNumOfMoves - bNumOfMoves);
+	if (board.pieceLists[(board.sideToMove == WHITE) ? BISHOP + 6 : BISHOP][COUNT] > 1) {
 		score += pieceValues[BISHOP] * 0.1;
 	}
-	if (board.pieceCount[BISHOP] == 2) {
+	if (board.pieceLists[(board.sideToMove == WHITE) ? BISHOP : BISHOP + 6][COUNT] > 1) {
 		score -= pieceValues[BISHOP] * 0.1;
 	}
+	int pawnCount = board.pieceLists[(board.sideToMove == WHITE) ? PAWN + 6 : PAWN][COUNT];
+	score += (knightPawnCountEval[pawnCount] + rookPawnCountEval[pawnCount] + TEMPO) * board.sideToMove;
 
-	return (score) * board.sideToMove;
+	score *= board.sideToMove;
+
+	evalTable.save(board.zobristKey, score);
+
+	return score;
 }
 
 int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int beta, int *moveToMake) {
@@ -510,15 +528,17 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 	int currDepth;
 	decHistoryTable();
 
-	std::cout << std::left << std::setw(6) << std::setfill(' ') << "Depth";
+	std::cout << std::left << std::setw(8) << std::setfill(' ') << "Depth";
+	std::cout << std::left << std::setw(8) << std::setfill(' ') << "Misses";
 	std::cout << std::left << std::setw(10) << std::setfill(' ') << "Nodes";
 	std::cout << std::left << std::setw(10) << std::setfill(' ') << "Time(ms)";
 	std::cout << std::left << std::setw(14) << std::setfill(' ') << "kNPS";
 	std::cout << std::left << std::setw(8) << std::setfill(' ') << "Score";
 	std::cout << std::left << std::setw(10) << std::setfill(' ') << "PV" << std::endl;
 
+	searchStart = timer.mseconds;
+
 	for (currDepth = 1; currDepth <= maxDepth; currDepth++) {
-		searchStart = timer.mseconds;
 		score = findBestMove(moves, numOfMoves, currDepth, alpha, beta, &newBest);
 		if (newBest == EMPTY_MOVE) {
 			std::cout << "TIMES UP" << std::endl;
@@ -536,10 +556,9 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 			windowMissCount++;
 			continue;
 		}
-		windowMissCount = 0;
 		alpha = score - WINDOW_SIZE;
 		beta = score + WINDOW_SIZE;
-		getSearchStats(currDepth, lastNodeCount, searchStart);
+		getSearchStats(currDepth, windowMissCount, lastNodeCount, searchStart);
 		bestMove = newBest;
 		if (wmsLeft != -1 && (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE > searchLength - timer.mseconds) { // next depth would take longer than remaining time
 			std::cout << "Ended search early as next depth would take " << (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE << " ms and we have " << searchLength - timer.mseconds << " ms remaining" << std::endl;
@@ -550,8 +569,10 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 			break;
 		}
 		lastNodeCount = nodeCount;
+		windowMissCount = 0;
+		searchStart = timer.mseconds;
 	}
-	getSearchStats(-1, 0, 0);
+	getSearchStats(-1, windowMissCount, 0, 0);
 
 	return bestMove;
 }
@@ -642,9 +663,9 @@ int Engine::SEE(int sq) { // TODO, can check for only legal moves, but this will
 	return score;
 }
 
-inline void Engine::getSearchStats(int searchDepth, unsigned long long prevNodeCount, unsigned long startTime) { // TODO, implement window misses
+inline void Engine::getSearchStats(int searchDepth, int windoMissCount, unsigned long long prevNodeCount, unsigned long startTime) { // TODO, implement window misses
 	const char separator = ' ';
-	const int nameWidth = 6;
+	const int nameWidth = 8;
 	const int numWidth = 10;
 
 	switch (mode) {
@@ -654,6 +675,7 @@ inline void Engine::getSearchStats(int searchDepth, unsigned long long prevNodeC
 			}
 			else {
 				std::cout << std::left << std::setw(nameWidth) << std::setfill(separator) << searchDepth;
+				std::cout << std::left << std::setw(nameWidth) << std::setfill(separator) << windoMissCount;
 			}
 			//std::cout << "Search to depth " << searchDepth << " took " << timer.mseconds - startTime << " milliseconds, and searched " << nodeCount - prevNodeCount << " nodes" << std::endl;
 			std::cout << std::left << std::setw(numWidth) << std::setfill(separator) << nodeCount - prevNodeCount;
@@ -803,14 +825,17 @@ void Engine::comInit() {
 	if (!pipe) {
 		SetConsoleMode(hstdin, dw&~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT));
 		FlushConsoleInputBuffer(hstdin);
+		mode = PROTO_NOTHING;
+		comSend("Type help for commands");
 	}
 	else {
 		std::cout.rdbuf()->pubsetbuf(NULL, 0);
 		std::cin.rdbuf()->pubsetbuf(NULL, 0);
+		mode = PROTO_UCI; 
 	}
 
 	task = TASK_NOTHING;
-	mode = PROTO_UCI;
+	
 }
 
 int Engine::comReceive() {
@@ -823,7 +848,7 @@ int Engine::comReceive() {
 		std::getline(std::cin, command);
 
 		switch (mode) {
-		//case PROTO_NOTHING: nothing(command); break;
+			case PROTO_NOTHING: comNothing(command); break;
 			case PROTO_UCI:		comUCI(command);	break;
 		}
 	}
@@ -848,6 +873,119 @@ int Engine::comInput() {
 	}
 
 	return 0;
+}
+
+int Engine::comNothing(std::string command) {
+	std::string buf; // Have a buffer string
+	std::stringstream ss(command); // Insert the string into a stream
+
+	std::vector<std::string> tokens; // Create vector to hold our words
+
+	while (ss >> buf)
+		tokens.push_back(buf);
+
+	if (tokens[0] == "help") {
+		comSend("print\t\tPrint board");
+		comSend("move xxxx\tMake move");
+		comSend("go\t\tFind move");
+	}
+	else if (tokens[0] == "go") {
+		board.printBoard();
+		int moves[218];
+		int numOfMoves;
+		int move;
+		std::stringstream moveStream;
+		if (board.inCheck(board.sideToMove)) {
+			numOfMoves = board.getLegalMovesInCheck(moves);
+		}
+		else {
+			numOfMoves = board.getLegalMoves(moves);
+		}
+		move = iterativeDeepening(moves, numOfMoves);
+		moveStream << "move found " << SQ_FILE((move & MOVE_FROM_SQ_MASK)) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT));
+		if (move & MOVE_PROMOTION_MASK) {
+			switch ((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) {
+			case QUEEN:
+				moveStream << "q";
+				break;
+			case ROOK:
+				moveStream << "r";
+				break;
+			case BISHOP:
+				moveStream << "b";
+				break;
+			case KNIGHT:
+				moveStream << "n";
+				break;
+			}
+		}
+		comSend(moveStream.str());
+		board.moveMake(move);
+
+		board.printBoard();
+	}
+	else if (tokens[0] == "print") {
+		board.printBoard();
+	}
+	else if (tokens[0] == "move") {
+		int move = 0;
+		std::string moveString = tokens.back();
+		std::string moveFrom = moveString.substr(0, 2);
+		std::string moveTo = moveString.substr(2);
+
+		int sqFrom = SQ_STR_TO_INT(moveFrom);
+		int sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
+
+		if (sqFrom == (board.history[board.historyIndex].move & MOVE_FROM_SQ_MASK) && sqTo == ((board.history[board.historyIndex].move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) {
+			comSend("ignoring my own move");
+			return 0; // the move the engine did so we ignore it
+		}
+
+		move = sqFrom | (sqTo << MOVE_TO_SQ_SHIFT);
+		move |= (board.board[sqFrom]) << MOVE_MOVED_PIECE_SHIFT;
+
+		if (moveTo.length() == 3) { //promotion
+			move |= (1 << MOVE_PROMOTION_SHIFT);
+			switch (moveTo.back()) {
+			case 'q':
+				move |= (QUEEN << MOVE_PROMOTED_TO_SHIFT);
+				break;
+			case 'r':
+				move |= (ROOK << MOVE_PROMOTED_TO_SHIFT);
+				break;
+			case 'b':
+				move |= (BISHOP << MOVE_PROMOTED_TO_SHIFT);
+				break;
+			case 'k':
+				move |= (KNIGHT << MOVE_PROMOTED_TO_SHIFT);
+				break;
+			default:
+				comSend("Unexpected third parameter in moveTo, was:");
+				comSend(moveTo);
+				break;
+			}
+		}
+
+		if (board.board[sqTo] != EMPTY)
+			move |= (1 << MOVE_CAPTURE_SHIFT);
+		move |= (board.board[sqTo] << MOVE_ATTACKED_PIECE_SHIFT);
+		if (sqTo == board.enPassant) move |= (1 << MOVE_EN_PASSANT_SHIFT);
+
+		if (board.board[sqFrom] == KING && abs(sqFrom - sqTo) == 2) {
+			if (sqFrom > sqTo) {
+				move |= (1 << MOVE_CASTLE_LONG_SHIFT);
+			}
+			else {
+				move |= (1 << MOVE_CASTLE_SHORT_SHIFT);
+			}
+		}
+
+		board.moveMake(move);
+
+		board.printBoard();
+	}
+	
+	return 1;
 }
 
 int Engine::comUCI(std::string command) {

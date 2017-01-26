@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include "Board.h"
 #include "Transposition.h"
+#include "EvalTable.h"
 #include "Timer.h"
 #include <thread>
 #include <string>
@@ -26,18 +27,20 @@ class Engine {
 		unsigned long long perft(int depth);
 		int iterativeDeepening(int *moves, int numOfMoves);
 		Transposition tTable;
+		EvalTable evalTable;
 		void infoPV(int searchLength, int score);
 		void comInit();
 		int comReceive();
 		int comUCI(std::string command);
 		int comInput();
+		int comNothing(std::string command);
 		void comSend(std::string command);
 		int historyMoves[120][120];
 		void decHistoryTable();
 		int killers[50][2];
 		void setKillers(int move, int ply);
 		void infoNPS(unsigned long long nodes, unsigned long startTime);
-		void getSearchStats(int searchDepth, unsigned long long prevNodeCount, unsigned long startTime);
+		void getSearchStats(int searchDepth, int windowMissCount, unsigned long long prevNodeCount, unsigned long startTime);
 		int SEE(int sq);
 		HANDLE hstdin;
 		int pipe;

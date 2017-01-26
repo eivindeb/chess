@@ -33,11 +33,8 @@ Board::Board(std::string fen) {
 }
 
 void Board::loadFromFen(std::string fen) {
-	for (int i = 0; i < 18; i++) {
-		pieceCount[i] = 0;
-	}
 	for (int i = 0; i < 12; i++) {
-		pieceLists[i][0] = 0;
+		pieceLists[i][COUNT] = 0;
 		for (int j = 1; j < 11; j++) {
 			pieceLists[i][j] = -1;
 		}
@@ -208,7 +205,7 @@ void Board::loadFromFen(std::string fen) {
 int Board::getSideMaterialValue(Color side) {
 	int pieceVal = 0;
 	for (int i = 0; i < 6; i++) {
-		pieceVal += pieceCount[i + 6*side + 6] * pieceValues[i];
+		pieceVal += pieceLists[(side == WHITE) ? i + 6 : i][0] * pieceValues[i];
 	}
 
 	return pieceVal;
@@ -248,7 +245,7 @@ int Board::getLegalMoves(int *moves) {
 	}
 
 	for (int pieceType = 0; pieceType < 6; pieceType++) {
-		for (int pieceIndex = 1; pieceIndex <= pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+		for (int pieceIndex = 1; pieceIndex <= pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][COUNT]; pieceIndex++) {
 			int sq = pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
 			if (pieceType <= 2) {
 				if (pieceType == PAWN) {
@@ -371,7 +368,7 @@ int Board::getLegalMovesInCheck(int *moves) {
 		// TODO can figure out directions there is no reason to search in, e.g. North and South if king is directly south of attacking piece
 		// instead of checking if in legalSquares, i can check if it is between kingSq and attackerSq and is a multiple of the direction i.e. ( sq > kingSq and sq <= attackerSq and sq % dir == 0)
 		for (int pieceType = 1; pieceType < 6; pieceType++) {
-			for (int pieceIndex = 1; pieceIndex <= pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+			for (int pieceIndex = 1; pieceIndex <= pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][COUNT]; pieceIndex++) {
 				int sq = pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
 				if (pieceType == PAWN) {
 					int dirMod = (sideToMove == WHITE) ? 0 : 4;
@@ -481,7 +478,7 @@ int Board::getQuiescenceMoves(int *moves) {
 	int newPos;
 
 	for (int pieceType = 0; pieceType < 6; pieceType++) {
-		for (int pieceIndex = 1; pieceIndex <= pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+		for (int pieceIndex = 1; pieceIndex <= pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][COUNT]; pieceIndex++) {
 			int sq = pieceLists[(sideToMove == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
 			if (pieceType <= 2) {
 				if (pieceType == PAWN) {
@@ -979,7 +976,6 @@ inline void Board::clearSq(int sq) {
 			tablePtr = PSTwPawnEG;
 			throw "Unknown piece type";
 		}
-		pieceCount[board[sq] + 6 * boardColor[sq] + 6]--;
 		positionTotal -= boardColor[sq] * tablePtr[sq];
 		int side = boardColor[sq] == WHITE ? 1 : 0;
 		zobristKey ^= zobrist.pieces[board[sq]][side][sq];
@@ -1068,7 +1064,6 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 				tablePtr = PSTwPawnEG;
 				throw "Unknown piece type";
 			}
-		pieceCount[piece + 6 * side + 6]++;
 		positionTotal += side * tablePtr[sq];
 		int sqSide = side == WHITE ? 1 : 0;
 		zobristKey ^= zobrist.pieces[piece][sqSide][sq];
@@ -1078,19 +1073,19 @@ inline void Board::setSq(int sq, Piece piece, Color side) {
 }
 
 inline void Board::pieceListRemovePiece(int sq, Piece piece, Color side) {
-	if (boardPieceIndex[sq] != pieceLists[(side == WHITE) ? 6 + piece : piece][0]) {
-		std::swap(pieceLists[(side == WHITE) ? 6 + piece : piece][pieceLists[(side == WHITE) ? 6 + piece : piece][0]], pieceLists[(side == WHITE) ? 6 + piece : piece][boardPieceIndex[sq]]);
+	if (boardPieceIndex[sq] != pieceLists[(side == WHITE) ? 6 + piece : piece][COUNT]) {
+		std::swap(pieceLists[(side == WHITE) ? 6 + piece : piece][pieceLists[(side == WHITE) ? 6 + piece : piece][COUNT]], pieceLists[(side == WHITE) ? 6 + piece : piece][boardPieceIndex[sq]]);
 		std::swap(boardPieceIndex[sq], boardPieceIndex[pieceLists[(side == WHITE) ? 6 + piece : piece][boardPieceIndex[sq]]]);
 		// to ensure no "holes" in piece list, we swap the element to be deleted with the last, and delete the last entry
 	}
 	pieceLists[(side == WHITE) ? 6 + piece : piece][boardPieceIndex[sq]] = -1;
-	pieceLists[(side == WHITE) ? 6 + piece : piece][0]--;
+	pieceLists[(side == WHITE) ? 6 + piece : piece][COUNT]--;
 	boardPieceIndex[sq] = -1;
 }
 
 inline void Board::pieceListAddPiece(int sq, Piece piece, Color side) {
-	pieceLists[(side == WHITE) ? 6 + piece : piece][++pieceLists[(side == WHITE) ? 6 + piece : piece][0]] = sq;
-	boardPieceIndex[sq] = pieceLists[(side == WHITE) ? 6 + piece : piece][0];
+	pieceLists[(side == WHITE) ? 6 + piece : piece][++pieceLists[(side == WHITE) ? 6 + piece : piece][COUNT]] = sq;
+	boardPieceIndex[sq] = pieceLists[(side == WHITE) ? 6 + piece : piece][COUNT];
 }
 
 inline void Board::pieceListMove(int fromSq, int toSq, Piece piece, Color side) {
@@ -1210,7 +1205,7 @@ bool Board::sqIsAttacked(int chkdSq, Color attackColor, int xRaySq, int ignoreAt
 		boardColor[xRaySq] = NONE;
 	}
 	for (int pieceType = 0; pieceType < 6; pieceType++) {
-		for (int pieceIndex = 1; pieceIndex <= pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+		for (int pieceIndex = 1; pieceIndex <= pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][COUNT]; pieceIndex++) {
 			int sq = pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
 			if (sq != chkdSq && sq != ignoreAttackerOnSq) {
 				lookupVal = chkdSq - sq + 128;
@@ -1255,7 +1250,7 @@ int Board::getSqAttackers(int *attackingSquares, int chkdSq, Color attackColor) 
 	int lookupVal;
 	int newPos;
 	for (int pieceType = 0; pieceType < 6; pieceType++) {
-		for (int pieceIndex = 1; pieceIndex <= pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][0]; pieceIndex++) {
+		for (int pieceIndex = 1; pieceIndex <= pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][COUNT]; pieceIndex++) {
 			int sq = pieceLists[(attackColor == WHITE) ? 6 + pieceType : pieceType][pieceIndex];
 			if (sq != chkdSq) {
 				lookupVal = chkdSq - sq + 128;
