@@ -39,6 +39,8 @@
 
 #define FIXED_SEARCH_DURATION	30*1000;
 
+#define MULTI_PV_LINE_NUM		3
+
 //49999991
 
 Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(4194311), evalTable(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
@@ -356,7 +358,7 @@ int Engine::evaluatePosition() {
 	return score;
 }
 
-int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int beta, int *moveToMake) {
+int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int beta, int *pvLines, int *scores) {
 	int score = -20000;
 	int bestIndex = 0;
 	nodeCount++;
@@ -368,7 +370,7 @@ int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int b
 	sortMoves(moves, numOfMoves, ttMove, 0);
 	for (int i = 0; i < numOfMoves; i++) {
 		if (timer.timesUp == true || stopSearch) {
-			*moveToMake = EMPTY_MOVE;
+			pvLines[0] = EMPTY_MOVE;
 			return INVALID;
 		}
 		board.moveMake(moves[i]);
@@ -384,14 +386,24 @@ int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int b
 		board.moveUnmake();
 		if (score > alpha) {
 			alpha = score;
-			*moveToMake = moves[i];
 			bestIndex = i;
 			if (score >= beta) {
 				tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, beta, TT_BETA, moves[bestIndex]);
 				return beta;
 			}
 			tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, alpha, TT_ALPHA, moves[bestIndex]);
-			infoPV(depth, score);
+			infoPV(depth, score, false);
+		}
+		for (int k = 0; k < MULTI_PV_LINE_NUM; k++) {
+			if (scores[k] == INVALID || score > scores[k]) {
+				for (int j = MULTI_PV_LINE_NUM - 1; j > k; j--) {
+					scores[j] = scores[j - 1];
+					pvLines[j] = pvLines[j - 1];
+				}
+				pvLines[k] = moves[i];
+				scores[k] = score;
+				break;
+			}
 		}
 	}
 
@@ -500,7 +512,7 @@ inline void Engine::quicksort(int *arr, int *order, const int left, const int ri
 	quicksort(arr, order, part + 1, right);
 }
 
-int Engine::iterativeDeepening(int *moves, int numOfMoves) {
+int Engine::iterativeDeepening(int *moves, int numOfMoves, bool timed) {
 	int score;
 	Color findMoveFor = board.sideToMove;
 
@@ -513,16 +525,25 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 		board.phaseFlag = PHASE_EG;
 	}
 	
+	int scores[MULTI_PV_LINE_NUM];
+	int multiPVLines[MULTI_PV_LINE_NUM];
+	int pvCount = 0;
 	int windowMissCount = 0;
-	int newBest = 0;
 	int bestMove = 0;
 	int alpha = -200000;
 	int beta = 200000;
 	int pvMove;
+	unsigned long searchLength;
 	stopSearch = false;
 	nodeCount = 0;
-	unsigned long searchLength = calculateTimeForMove(findMoveFor);
+	if (timed) {
+		searchLength = calculateTimeForMove(findMoveFor);
+	}
+	else {
+		searchLength = 0;
+	}
 	timer.start(true, searchLength);
+	
 	unsigned long searchStart;
 	unsigned long long lastNodeCount = 0;
 	int currDepth;
@@ -539,9 +560,14 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 	searchStart = timer.mseconds;
 
 	for (currDepth = 1; currDepth <= maxDepth; currDepth++) {
-		score = findBestMove(moves, numOfMoves, currDepth, alpha, beta, &newBest);
-		if (newBest == EMPTY_MOVE) {
-			std::cout << "TIMES UP" << std::endl;
+		pvCount = 0;
+		for (int i = 0; i < MULTI_PV_LINE_NUM; i++) {
+			multiPVLines[i] = -1;
+			scores[i] = INVALID;
+		}
+		score = findBestMove(moves, numOfMoves, currDepth, alpha, beta, multiPVLines, scores);
+		if (multiPVLines[0] == EMPTY_MOVE) {
+			//std::cout << "TIMES UP" << std::endl;
 			break;
 		}
 		if (score <= alpha) {
@@ -558,8 +584,13 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 		}
 		alpha = score - WINDOW_SIZE;
 		beta = score + WINDOW_SIZE;
-		getSearchStats(currDepth, windowMissCount, lastNodeCount, searchStart);
-		bestMove = newBest;
+		for (pvCount = 1; pvCount < MULTI_PV_LINE_NUM; pvCount++) {
+			if (multiPVLines[pvCount] == -1) {
+				break;
+			}
+		}
+		getSearchStats(currDepth, windowMissCount, lastNodeCount, searchStart, scores, multiPVLines, pvCount);
+		bestMove = multiPVLines[0];
 		if (wmsLeft != -1 && (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE > searchLength - timer.mseconds) { // next depth would take longer than remaining time
 			std::cout << "Ended search early as next depth would take " << (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE << " ms and we have " << searchLength - timer.mseconds << " ms remaining" << std::endl;
 			timer.stop();
@@ -572,7 +603,7 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves) {
 		windowMissCount = 0;
 		searchStart = timer.mseconds;
 	}
-	getSearchStats(-1, windowMissCount, 0, 0);
+	//getSearchStats(-1, windowMissCount, 0, 0, INVALID, );
 
 	return bestMove;
 }
@@ -663,7 +694,7 @@ int Engine::SEE(int sq) { // TODO, can check for only legal moves, but this will
 	return score;
 }
 
-inline void Engine::getSearchStats(int searchDepth, int windoMissCount, unsigned long long prevNodeCount, unsigned long startTime) { // TODO, implement window misses
+inline void Engine::getSearchStats(int searchDepth, int windoMissCount, unsigned long long prevNodeCount, unsigned long startTime, int* scores, int* pvLines, int pvCount) { // TODO, implement window misses
 	const char separator = ' ';
 	const int nameWidth = 8;
 	const int numWidth = 10;
@@ -683,14 +714,23 @@ inline void Engine::getSearchStats(int searchDepth, int windoMissCount, unsigned
 			infoNPS(nodeCount - prevNodeCount, startTime);
 			if (searchDepth != -1) {
 				std::cout << "\t";
-				infoPV(searchDepth, INVALID);
+				for (int i = 0; i < pvCount; i++) {
+					if (i != 0) {
+						std::cout << "\t\t\t\t\t\t(";
+					}
+					infoPV(searchDepth, scores[i], true, pvLines[i]);
+					if (i != 0) {
+						std::cout << ")";
+					}
+					std::cout << std::endl;
+				}
+				
 			}
-			std::cout << std::endl;
 			break;
 		case PROTO_UCI:
 			infoNPS(nodeCount - prevNodeCount, startTime);
 			if (searchDepth != -1)
-				infoPV(searchDepth, INVALID);
+				infoPV(searchDepth, scores[0], true);
 			break;
 	}
 	
@@ -738,13 +778,13 @@ inline void Engine::infoNPS(unsigned long long nodes, unsigned long startTime) {
 	}
 }
 
-void Engine::infoPV(int searchDepth, int score) {
-	if (score != INVALID && mode == PROTO_NOTHING) {
+void Engine::infoPV(int searchDepth, int score, bool depthFinished, int pvLine) {
+	if (!depthFinished && mode == PROTO_NOTHING) {
 		return;
 	}
 	int pvLength = 0;
 	TT_FLAG lastMoveFlag;
-	int pvMove;
+	int pvMove = pvLine;
 	std::string pvString;
 	std::stringstream pvSS;
 	switch (mode) {
@@ -754,15 +794,12 @@ void Engine::infoPV(int searchDepth, int score) {
 	}
 	int j;
 	for (j = 0; j < searchDepth; j++) {
-		if (!(lastMoveFlag = tTable.getPV(board.zobristKey, &pvMove))) {
+		if (j != 0 && (lastMoveFlag = tTable.getPV(board.zobristKey, &pvMove)) == TT_INVALID) {
 			break;
 		}
 		pvSS << SQ_FILE((pvMove & MOVE_FROM_SQ_MASK)) << SQ_RANK((pvMove & MOVE_FROM_SQ_MASK)) << SQ_FILE(((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << " ";
 		board.moveMake(pvMove);
 		pvLength++;
-		//if (lastMoveFlag != TT_EXACT) {
-		//	break;
-		//}
 	}
 	if (score == INVALID) {
 		if (j == searchDepth) {
@@ -783,9 +820,9 @@ void Engine::infoPV(int searchDepth, int score) {
 	else if (mode == PROTO_UCI) {
 		pvSS << "score cp " << score;
 	}
-	//else if (mode == PROTO_NOTHING) {
-	//	pvString = std::to_string(score) + "\t" + pvSS.str();
-	//}
+	else if (mode == PROTO_NOTHING) {
+		pvString = std::to_string(score) + "\t" + pvSS.str();
+	}
 
 	for (int j = 0; j < pvLength; j++) {
 		board.moveUnmake();
@@ -814,6 +851,36 @@ inline void Engine::setKillers(int move, int ply) {
 		killers[ply][KILLER_SECONDARY] = killers[ply][KILLER_PRIMARY];
 		killers[ply][KILLER_PRIMARY] = move;
 	}
+}
+
+void Engine::playGame(std::string fen) {
+	if (fen != "") {
+		board.loadFromFen(fen);
+	}
+
+	int moves[218];
+	int numOfMoves;
+	int move;
+
+	board.printBoard();
+
+	while (1) {
+		if (board.inCheck(board.sideToMove)) {
+			numOfMoves = board.getLegalMovesInCheck(moves);
+			if (numOfMoves == 0) {
+				break;
+			}
+		}
+		else {
+			numOfMoves = board.getLegalMoves(moves);
+		}
+		move = iterativeDeepening(moves, numOfMoves, true);
+		board.moveMake(move);
+		board.printBoard();
+		board.printMove(move);
+	}
+
+	std::cout << ((board.sideToMove == WHITE) ? "Black" : "White") << " won in " << board.halfMoveCount / 2 << " moves!" << std::endl;
 }
 
 
@@ -846,10 +913,17 @@ int Engine::comReceive() {
 
 	while (1) {
 		std::getline(std::cin, command);
+		std::thread serviceCommandThread;
 
 		switch (mode) {
-			case PROTO_NOTHING: comNothing(command); break;
-			case PROTO_UCI:		comUCI(command);	break;
+			case PROTO_NOTHING: 
+				serviceCommandThread = std::thread([this, command] {this->comNothing(command); });
+				serviceCommandThread.detach();
+				break;
+			case PROTO_UCI:
+				serviceCommandThread = std::thread([this, command] {this->comUCI(command); });
+				serviceCommandThread.detach();
+				break;
 		}
 	}
 
@@ -889,7 +963,20 @@ int Engine::comNothing(std::string command) {
 		comSend("move xxxx\tMake move");
 		comSend("go\t\tFind move");
 	}
+	else if (tokens[0] == "stop") {
+		stopSearch = true;
+	}
+	else if (tokens[0] == "fen") {
+		if (tokens.size() > 1) {
+			board.loadFromFen(tokens[1]);
+		}
+		else comSend(board.getFenString());
+	}
 	else if (tokens[0] == "go") {
+		bool timed = true;
+		if (tokens.size() > 1 && tokens[1] == "infinite") {
+			timed = false;
+		}
 		board.printBoard();
 		int moves[218];
 		int numOfMoves;
@@ -901,7 +988,7 @@ int Engine::comNothing(std::string command) {
 		else {
 			numOfMoves = board.getLegalMoves(moves);
 		}
-		move = iterativeDeepening(moves, numOfMoves);
+		move = iterativeDeepening(moves, numOfMoves, timed);
 		moveStream << "move found " << SQ_FILE((move & MOVE_FROM_SQ_MASK)) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT));
 		if (move & MOVE_PROMOTION_MASK) {
 			switch ((move & MOVE_PROMOTED_TO_MASK) >> MOVE_PROMOTED_TO_SHIFT) {
@@ -926,6 +1013,12 @@ int Engine::comNothing(std::string command) {
 	}
 	else if (tokens[0] == "print") {
 		board.printBoard();
+	}
+	else if (tokens[0] == "play") {
+		if (tokens.size() == 2) // if fen input
+			playGame(tokens[1]);
+		else
+			playGame();
 	}
 	else if (tokens[0] == "move") {
 		int move = 0;
@@ -1119,7 +1212,7 @@ int Engine::comUCI(std::string command) {
 			else {
 				numOfMoves = board.getLegalMoves(moves);
 			}
-			move = iterativeDeepening(moves, numOfMoves);
+			move = iterativeDeepening(moves, numOfMoves, true);
 
 			moveStream << "bestmove " << SQ_FILE((move & MOVE_FROM_SQ_MASK)) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT));
 			if (move & MOVE_PROMOTION_MASK) {

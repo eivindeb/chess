@@ -14,7 +14,7 @@ class Engine {
 	public:
 		Engine(int _sideToPlay, int _depth, std::string fen = "", bool console = false);
 		void sortMoves(int *moves, int numOfMoves, int bestMoveId, int ply);
-		int findBestMove(int *moves, int numOfMoves, int depth, int alpha, int beta, int *moveToMake);
+		int findBestMove(int *moves, int numOfMoves, int depth, int alpha, int beta, int *pvLines, int *scores);
 		int miniMax(int depthLeft);
 		int alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNull, bool isPV);
 		bool isRepetition();
@@ -25,10 +25,10 @@ class Engine {
 		void mvvLva(int *moves, int numOfMoves);
 		int sideToPlay;
 		unsigned long long perft(int depth);
-		int iterativeDeepening(int *moves, int numOfMoves);
+		int iterativeDeepening(int *moves, int numOfMoves, bool timed);
 		Transposition tTable;
 		EvalTable evalTable;
-		void infoPV(int searchLength, int score);
+		void infoPV(int searchLength, int score, bool depthFinished, int pvLine=-1);
 		void comInit();
 		int comReceive();
 		int comUCI(std::string command);
@@ -40,8 +40,9 @@ class Engine {
 		int killers[50][2];
 		void setKillers(int move, int ply);
 		void infoNPS(unsigned long long nodes, unsigned long startTime);
-		void getSearchStats(int searchDepth, int windowMissCount, unsigned long long prevNodeCount, unsigned long startTime);
+		void getSearchStats(int searchDepth, int windowMissCount, unsigned long long prevNodeCount, unsigned long startTime, int *scores, int *pvLines, int pvCount);
 		int SEE(int sq);
+		void playGame(std::string fen = "");
 		HANDLE hstdin;
 		int pipe;
 		Task task;

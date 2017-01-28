@@ -13,7 +13,7 @@ void Timer::start(bool fromStart, unsigned long duration) {
 	if (fromStart == true) {
 		mseconds = 0;
 	}
-	msecondsMax = duration;
+	msecondsMax = (duration == 0) ? -1 : duration;
 
 	std::thread t1 = std::thread([this] {this->incTimer(); });
 	threadId = t1.get_id();

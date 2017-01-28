@@ -1528,11 +1528,12 @@ std::string Board::getFenString() {
 	if (!castling) fen += "- ";
 
 	if (enPassant != -1) {
+		fen += " ";
 		fen += char((enPassant % 8) + 97) + std::to_string((enPassant / 16) + 1);
 		fen += " ";
 	}
 	else {
-		fen += "- ";
+		fen += " - ";
 	}
 
 	fen += std::to_string(halfMoveClk);

@@ -13,7 +13,7 @@
 
 int main()
 {	
-	Engine myengine = Engine(1, 20, "", false);
+	Engine myengine = Engine(1, 20, "1r2brk1/1p1n2pp/2p1pn2/p2p1p2/P1PP1P2/2N1PN2/P4PBP/1R2K2R w K a6 0 8", false);
 	/*Move moves[218];
 	int numOfMoves;
 	int index;
@@ -44,7 +44,7 @@ int main()
 			numOfMoves = myengine.board.getLegalMoves(moves);
 		}
 		if (myengine.board.sideToMove == myengine.sideToPlay || myengine.sideToPlay == 2) {
-			move = myengine.iterativeDeepening(moves, numOfMoves);
+			move = myengine.iterativeDeepening(moves, numOfMoves, true);
 		}
 		else {
 			myengine.board.printMoves(moves, numOfMoves);
