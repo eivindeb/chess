@@ -331,14 +331,14 @@ int Engine::evaluatePosition() {
 	int wNumOfMoves;
 	int bNumOfMoves;
 	if (board.sideToMove == WHITE) {
-		wNumOfMoves = board.getLegalMoves(moves);
+		wNumOfMoves = (board.inCheck(WHITE)) ? board.getLegalMovesInCheck(moves) : board.getLegalMoves(moves);
 		board.sideToMove = Color(board.sideToMove*(-1));
-		bNumOfMoves = board.getLegalMoves(moves);
+		bNumOfMoves = (board.inCheck(BLACK)) ? board.getLegalMovesInCheck(moves) : board.getLegalMoves(moves);
 	}
 	else {
-		bNumOfMoves = board.getLegalMoves(moves);
+		bNumOfMoves = (board.inCheck(BLACK)) ? board.getLegalMovesInCheck(moves) : board.getLegalMoves(moves);
 		board.sideToMove = Color(board.sideToMove*(-1));
-		wNumOfMoves = board.getLegalMoves(moves);
+		wNumOfMoves = (board.inCheck(WHITE)) ? board.getLegalMovesInCheck(moves) : board.getLegalMoves(moves);
 	}
 	board.sideToMove = Color(board.sideToMove*(-1)); // mobility slows down evaluation A LOT.
 	score = board.materialTotal + board.positionTotal + mobilityWeight * (wNumOfMoves - bNumOfMoves);
@@ -349,7 +349,7 @@ int Engine::evaluatePosition() {
 		score -= pieceValues[BISHOP] * 0.1;
 	}
 	int pawnCount = board.pieceLists[(board.sideToMove == WHITE) ? PAWN + 6 : PAWN][COUNT];
-	score += (knightPawnCountEval[pawnCount] + rookPawnCountEval[pawnCount] + TEMPO) * board.sideToMove;
+	score += (knightPawnCountEval[pawnCount] + rookPawnCountEval[pawnCount]) * board.sideToMove;
 
 	score *= board.sideToMove;
 
@@ -379,7 +379,7 @@ int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int b
 			continue;
 		}
 
-		if ((i == 0) || (-alphaBeta(-alpha - 1, -alpha, depth - 1, 1, ALLOW_NULL, NOT_PV) > alpha)) { // principal variation search
+		if ((i == 0) || ((score = -alphaBeta(-alpha - 1, -alpha, depth - 1, 1, ALLOW_NULL, NOT_PV)) > alpha)) { // principal variation search
 			score = -alphaBeta(-beta, -alpha, depth - 1, 1, ALLOW_NULL, IS_PV);
 		}
 
@@ -389,6 +389,7 @@ int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int b
 			bestIndex = i;
 			if (score >= beta) {
 				tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, beta, TT_BETA, moves[bestIndex]);
+				pvLines[0] = moves[bestIndex];
 				return beta;
 			}
 			tTable.saveEntry(board.zobristKey, depth, board.halfMoveCount, alpha, TT_ALPHA, moves[bestIndex]);
@@ -562,7 +563,7 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves, bool timed) {
 	for (currDepth = 1; currDepth <= maxDepth; currDepth++) {
 		pvCount = 0;
 		for (int i = 0; i < MULTI_PV_LINE_NUM; i++) {
-			multiPVLines[i] = -1;
+			multiPVLines[i] = EMPTY_MOVE;
 			scores[i] = INVALID;
 		}
 		score = findBestMove(moves, numOfMoves, currDepth, alpha, beta, multiPVLines, scores);
@@ -794,7 +795,7 @@ void Engine::infoPV(int searchDepth, int score, bool depthFinished, int pvLine) 
 	}
 	int j;
 	for (j = 0; j < searchDepth; j++) {
-		if (j != 0 && (lastMoveFlag = tTable.getPV(board.zobristKey, &pvMove)) == TT_INVALID) {
+		if ((lastMoveFlag = tTable.getPV(board.zobristKey, &pvMove)) == TT_INVALID && j != 0) {
 			break;
 		}
 		pvSS << SQ_FILE((pvMove & MOVE_FROM_SQ_MASK)) << SQ_RANK((pvMove & MOVE_FROM_SQ_MASK)) << SQ_FILE(((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((pvMove & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << " ";
@@ -962,6 +963,9 @@ int Engine::comNothing(std::string command) {
 		comSend("print\t\tPrint board");
 		comSend("move xxxx\tMake move");
 		comSend("go\t\tFind move");
+	}
+	else if (tokens[0] == "exit") {
+		exit(0);
 	}
 	else if (tokens[0] == "stop") {
 		stopSearch = true;
