@@ -37,7 +37,7 @@
 
 #define R	2	//reduction depth
 
-#define FIXED_SEARCH_DURATION	30*1000;
+#define FIXED_SEARCH_DURATION	5*1000;
 
 #define MULTI_PV_LINE_NUM		3
 
@@ -46,6 +46,20 @@
 Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(4194311), evalTable(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
+	boardLock = CreateMutex(
+		NULL,              // default security attributes
+		false,             // initially not owned
+		L"LockTest");      // named mutex
+
+	if (boardLock == NULL)
+	{
+		std::cout << GetLastError() << " Error creating mutex handle" << std::endl;
+		exit(0);
+	}
+	if (GetLastError() == ERROR_ALREADY_EXISTS)
+	{
+		std::cout << GetLastError() << " Mutex already created" << std::endl;
+	}
 	if (!console) {
 		comInit();
 		std::thread t1 = std::thread([this] {this->comReceive(); });
@@ -550,13 +564,15 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves, bool timed) {
 	int currDepth;
 	decHistoryTable();
 
-	std::cout << std::left << std::setw(8) << std::setfill(' ') << "Depth";
-	std::cout << std::left << std::setw(8) << std::setfill(' ') << "Misses";
-	std::cout << std::left << std::setw(10) << std::setfill(' ') << "Nodes";
-	std::cout << std::left << std::setw(10) << std::setfill(' ') << "Time(ms)";
-	std::cout << std::left << std::setw(14) << std::setfill(' ') << "kNPS";
-	std::cout << std::left << std::setw(8) << std::setfill(' ') << "Score";
-	std::cout << std::left << std::setw(10) << std::setfill(' ') << "PV" << std::endl;
+	if (mode == PROTO_NOTHING) {
+		std::cout << std::left << std::setw(8) << std::setfill(' ') << "Depth";
+		std::cout << std::left << std::setw(8) << std::setfill(' ') << "Misses";
+		std::cout << std::left << std::setw(10) << std::setfill(' ') << "Nodes";
+		std::cout << std::left << std::setw(10) << std::setfill(' ') << "Time(ms)";
+		std::cout << std::left << std::setw(14) << std::setfill(' ') << "kNPS";
+		std::cout << std::left << std::setw(8) << std::setfill(' ') << "Score";
+		std::cout << std::left << std::setw(10) << std::setfill(' ') << "PV" << std::endl;
+	}
 
 	searchStart = timer.mseconds;
 
@@ -1085,6 +1101,61 @@ int Engine::comNothing(std::string command) {
 	return 1;
 }
 
+int Engine::moveStringToInt(std::string moveString) {
+	std::string moveFrom = moveString.substr(0, 2);
+	std::string moveTo = moveString.substr(2);
+	int move = 0;
+
+	int sqFrom = SQ_STR_TO_INT(moveFrom);
+	int sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
+
+	if (sqFrom == (board.history[board.historyIndex].move & MOVE_FROM_SQ_MASK) && sqTo == ((board.history[board.historyIndex].move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) {
+		comSend("ignoring my own move");
+		return 0; // the move the engine did so we ignore it
+	}
+
+	move = sqFrom | (sqTo << MOVE_TO_SQ_SHIFT);
+	move |= (board.board[sqFrom]) << MOVE_MOVED_PIECE_SHIFT;
+
+	if (moveTo.length() == 3) { //promotion
+		move |= (1 << MOVE_PROMOTION_SHIFT);
+		switch (moveTo.back()) {
+		case 'q':
+			move |= (QUEEN << MOVE_PROMOTED_TO_SHIFT);
+			break;
+		case 'r':
+			move |= (ROOK << MOVE_PROMOTED_TO_SHIFT);
+			break;
+		case 'b':
+			move |= (BISHOP << MOVE_PROMOTED_TO_SHIFT);
+			break;
+		case 'k':
+			move |= (KNIGHT << MOVE_PROMOTED_TO_SHIFT);
+			break;
+		default:
+			comSend("Unexpected third parameter in moveTo, was:");
+			comSend(moveTo);
+			break;
+		}
+	}
+
+	if (board.board[sqTo] != EMPTY)
+		move |= (1 << MOVE_CAPTURE_SHIFT);
+	move |= (board.board[sqTo] << MOVE_ATTACKED_PIECE_SHIFT);
+	if (sqTo == board.enPassant) move |= (1 << MOVE_EN_PASSANT_SHIFT);
+
+	if (board.board[sqFrom] == KING && abs(sqFrom - sqTo) == 2) {
+		if (sqFrom > sqTo) {
+			move |= (1 << MOVE_CASTLE_LONG_SHIFT);
+		}
+		else {
+			move |= (1 << MOVE_CASTLE_SHORT_SHIFT);
+		}
+	}
+
+	return move;
+}
+
 int Engine::comUCI(std::string command) {
 	if (command == "uci") {
 		comSend("id name c++hess Bugged");
@@ -1110,6 +1181,8 @@ int Engine::comUCI(std::string command) {
 
 		std::vector<std::string> tokens; // Create vector to hold our words
 
+		WaitForSingleObject(boardLock, INFINITE); //aquire board lock
+
 		while (ss >> buf)
 			tokens.push_back(buf);
 
@@ -1117,66 +1190,26 @@ int Engine::comUCI(std::string command) {
 			if (tokens[1] == "startpos" && tokens.size() == 2) {
 				board.loadFromFen(START_FEN);
 			}
+			else if (board.historyIndex == -1) {
+				int moveStartIndex;
+				comSend("Loading from pgn");
+				if (tokens[1] == "fen") {
+					std::string fen = tokens[2] + " " + tokens[3] + " " + tokens[4] + " " + tokens[5] + " " + tokens[6] + " " + tokens[7];
+					board.loadFromFen(fen);
+					comSend("Fen " + fen);
+					moveStartIndex = 9;
+				}
+				else {
+					board.loadFromFen(START_FEN);
+					moveStartIndex = 3;
+				}
+				for (int i = moveStartIndex; i < tokens.size(); i++) {
+					board.moveMake(moveStringToInt(tokens[i]));
+				}
+			}
 			else {
-				std::string moveString = tokens.back();
-				std::string moveFrom = moveString.substr(0, 2);
-				std::string moveTo = moveString.substr(2);
-				int move = 0;
-				
-				int sqFrom = SQ_STR_TO_INT(moveFrom);
-				int sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
-				
-				if (sqFrom == (board.history[board.historyIndex].move & MOVE_FROM_SQ_MASK)  && sqTo == ((board.history[board.historyIndex].move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) {
-					comSend("ignoring my own move"); 
-					return 0; // the move the engine did so we ignore it
-				}
-
-				move = sqFrom | (sqTo << MOVE_TO_SQ_SHIFT);
-				move |= (board.board[sqFrom]) << MOVE_MOVED_PIECE_SHIFT;
-
-				if (moveTo.length() == 3) { //promotion
-					move |= (1 << MOVE_PROMOTION_SHIFT);
-					switch (moveTo.back()) {
-					case 'q':
-						move |= (QUEEN << MOVE_PROMOTED_TO_SHIFT);
-						break;
-					case 'r':
-						move |= (ROOK << MOVE_PROMOTED_TO_SHIFT);
-						break;
-					case 'b':
-						move |= (BISHOP << MOVE_PROMOTED_TO_SHIFT);
-						break;
-					case 'k':
-						move |= (KNIGHT << MOVE_PROMOTED_TO_SHIFT);
-						break;
-					default:
-						comSend("Unexpected third parameter in moveTo, was:");
-						comSend(moveTo);
-						break;
-					}
-				}
-
-				if (board.board[sqTo] != EMPTY)
-					move |= (1 << MOVE_CAPTURE_SHIFT);
-				move |= (board.board[sqTo] << MOVE_ATTACKED_PIECE_SHIFT);
-				if (sqTo == board.enPassant) move |= (1 << MOVE_EN_PASSANT_SHIFT);
-
-				if (board.board[sqFrom] == KING && abs(sqFrom - sqTo) == 2) {
-					if (sqFrom > sqTo) {
-						move |= (1 << MOVE_CASTLE_LONG_SHIFT);
-					}
-					else {
-						move |= (1 << MOVE_CASTLE_SHORT_SHIFT);
-					}
-				}
-
-
-				std::stringstream moveStream;
-				//moveStream << "received move " << SQ_FILE((move & MOVE_FROM_SQ_MASK)) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT));
-				comSend(moveStream.str());
-				//comSend("Move value " + std::to_string(move));
+				int move = moveStringToInt(tokens.back());
 				board.printMove(move);
-
 				board.moveMake(move);
 			}
 		}
@@ -1238,6 +1271,7 @@ int Engine::comUCI(std::string command) {
 			comSend(moveStream.str());
 			board.moveMake(move);
 		}
+		ReleaseMutex(boardLock);
 	}
 
 	return 0;
