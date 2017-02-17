@@ -7,6 +7,7 @@ class Transposition {
 		TT_FLAG getPV(unsigned long long zobristKey, int *pvMove);
 		int size;
 		int probe(unsigned long long zobristKey, uint8_t depth, int alpha, int beta, int *bestMove);
+		void clearTables();
 	private:
 		TranspositionEntry* tableDepth;
 		TranspositionEntry* tableAlways;

@@ -29,6 +29,7 @@ class Engine {
 		Transposition tTable;
 		EvalTable evalTable;
 		void infoPV(int searchLength, int score, bool depthFinished, int pvLine=-1);
+		int moveStringToInt(std::string moveString);
 		void comInit();
 		int comReceive();
 		int comUCI(std::string command);
@@ -49,6 +50,7 @@ class Engine {
 		Mode mode;
 		Timer timer;
 	private:
+		void* boardLock;
 		int orderingValues[218]; // optimization, putting it here so that it isnt initialized every time in sortMoves
 		void quicksort(int *arr, int *order, const int left, const int right);
 		int partition(int *arr, int *order, const int left, const int right);

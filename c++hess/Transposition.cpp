@@ -7,7 +7,10 @@ Transposition::Transposition(unsigned long long tableSize) {
 	size = (tableSize / sizeof(TranspositionEntry)) - 1;
 	tableAlways = new TranspositionEntry[tableSize];
 	tableDepth = new TranspositionEntry[tableSize];
+	clearTables();
+}
 
+void Transposition::clearTables() {
 	for (int i = 0; i < size; i++) {
 		tableAlways[i] = TranspositionEntry{ 0, 0, 0, 0, 0, TT_INVALID };
 		tableDepth[i] = TranspositionEntry{ 0, 0, 0, 0, 0, TT_INVALID };

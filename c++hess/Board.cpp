@@ -1525,7 +1525,7 @@ std::string Board::getFenString() {
 		fen += "q";
 		castling = true;
 	}
-	if (!castling) fen += "- ";
+	if (!castling) fen += "-";
 
 	if (enPassant != -1) {
 		fen += " ";
@@ -1540,7 +1540,7 @@ std::string Board::getFenString() {
 
 	fen += " ";
 
-	fen += std::to_string(int(halfMoveCount / 2) + 1);
+	fen += std::to_string(int(halfMoveCount / 2));
 
 	return fen;
 }

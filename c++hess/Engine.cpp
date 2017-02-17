@@ -37,7 +37,7 @@
 
 #define R	2	//reduction depth
 
-#define FIXED_SEARCH_DURATION	5*1000;
+#define FIXED_SEARCH_DURATION	10*1000;
 
 #define MULTI_PV_LINE_NUM		3
 
@@ -46,6 +46,7 @@
 Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(4194311), evalTable(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
+	// Create mutex for board to be used by multithreaded communication
 	boardLock = CreateMutex(
 		NULL,              // default security attributes
 		false,             // initially not owned
@@ -362,8 +363,9 @@ int Engine::evaluatePosition() {
 	if (board.pieceLists[(board.sideToMove == WHITE) ? BISHOP : BISHOP + 6][COUNT] > 1) {
 		score -= pieceValues[BISHOP] * 0.1;
 	}
-	int pawnCount = board.pieceLists[(board.sideToMove == WHITE) ? PAWN + 6 : PAWN][COUNT];
-	score += (knightPawnCountEval[pawnCount] + rookPawnCountEval[pawnCount]) * board.sideToMove;
+	int wPawnCount = board.pieceLists[PAWN + 6][COUNT];
+	int bPawnCount = board.pieceLists[PAWN][COUNT];
+	score += (knightPawnCountEval[wPawnCount] - knightPawnCountEval[bPawnCount] + rookPawnCountEval[wPawnCount] - rookPawnCountEval[bPawnCount]) * board.sideToMove;
 
 	score *= board.sideToMove;
 
@@ -383,7 +385,7 @@ int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int b
 	tTable.probe(board.zobristKey, depth, alpha, beta, &ttMove);
 	sortMoves(moves, numOfMoves, ttMove, 0);
 	for (int i = 0; i < numOfMoves; i++) {
-		if (timer.timesUp == true || stopSearch) {
+		if (timer.timesUp || stopSearch) {
 			pvLines[0] = EMPTY_MOVE;
 			return INVALID;
 		}
@@ -588,15 +590,13 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves, bool timed) {
 			break;
 		}
 		if (score <= alpha) {
-			alpha -= pow(2 * WINDOW_SIZE, windowMissCount + 1);
+			alpha -= pow(2 * WINDOW_SIZE, windowMissCount++);
 			currDepth--;
-			windowMissCount++;
 			continue;
 		}
 		else if (score >= beta) {
-			beta += pow(2 * WINDOW_SIZE, windowMissCount + 1);
+			beta += pow(2 * WINDOW_SIZE, windowMissCount++);
 			currDepth--;
-			windowMissCount++;
 			continue;
 		}
 		alpha = score - WINDOW_SIZE;
@@ -626,7 +626,7 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves, bool timed) {
 }
 
 int Engine::SEE(int sq) { // TODO, can check for only legal moves, but this will slow down and might not be necessary as SEE is only used as a guideline
-	int wAttackers[20]; // TODO really hoping we never go over 16 here
+	int wAttackers[20];
 	int bAttackers[20];
 
 	int numOfwAttackers = board.getSqAttackers(wAttackers, sq, WHITE);
@@ -976,9 +976,15 @@ int Engine::comNothing(std::string command) {
 		tokens.push_back(buf);
 
 	if (tokens[0] == "help") {
-		comSend("print\t\tPrint board");
+		comSend("print board\tPrint board");
 		comSend("move xxxx\tMake move");
+		comSend("print moves\tPrint moves");
 		comSend("go\t\tFind move");
+		comSend("fen [fen]\tGet current fen or load from given fen");
+		comSend("stop\t\tStop current search");
+		comSend("analyze\t\tAnalyze position");
+		comSend("evaluate\t\tEvaluate position");
+		comSend("exit\t\tEnd process");
 	}
 	else if (tokens[0] == "exit") {
 		exit(0);
@@ -991,6 +997,9 @@ int Engine::comNothing(std::string command) {
 			board.loadFromFen(tokens[1]);
 		}
 		else comSend(board.getFenString());
+	}
+	else if (tokens[0] == "evaluate") {
+		comSend(std::to_string(evaluatePosition() * board.sideToMove) + ", higher is better for white");
 	}
 	else if (tokens[0] == "go") {
 		bool timed = true;
@@ -1032,7 +1041,15 @@ int Engine::comNothing(std::string command) {
 		board.printBoard();
 	}
 	else if (tokens[0] == "print") {
-		board.printBoard();
+		if (tokens.size() > 1 && tokens[1] == "moves") {
+			int moves[218];
+			int numOfMoves;
+			if (board.inCheck(board.sideToMove)) numOfMoves = board.getLegalMovesInCheck(moves);
+			else numOfMoves = board.getLegalMoves(moves);
+
+			board.printMoves(moves, numOfMoves);
+		} else if (tokens.size() > 1 && tokens[1] == "board") 
+			board.printBoard();
 	}
 	else if (tokens[0] == "play") {
 		if (tokens.size() == 2) // if fen input
@@ -1092,10 +1109,25 @@ int Engine::comNothing(std::string command) {
 				move |= (1 << MOVE_CASTLE_SHORT_SHIFT);
 			}
 		}
+		bool moveIsLegal = false;
 
-		board.moveMake(move);
-
-		board.printBoard();
+		int moves[218];
+		int numOfMoves;
+		if (board.inCheck(board.sideToMove)) numOfMoves = board.getLegalMovesInCheck(moves);
+		else numOfMoves = board.getLegalMoves(moves);
+		for (int i = 0; i < numOfMoves; i++) {
+			if (moves[i] == move) {
+				moveIsLegal = true;
+				break;
+			}
+		}
+		if (moveIsLegal) {
+			board.moveMake(move);
+			board.printBoard();
+		}
+		else {
+			comSend("move is not legal, use 'print moves' to print all legal moves");
+		}
 	}
 	
 	return 1;
@@ -1174,6 +1206,7 @@ int Engine::comUCI(std::string command) {
 	}
 	else if (command == "ucinewgame") {
 		board = Board();
+		tTable.clearTables();
 	}
 	else {
 		std::string buf; // Have a buffer string
@@ -1222,20 +1255,16 @@ int Engine::comUCI(std::string command) {
 						break;
 					}
 					if (tokens[i] == "wtime") {
-						wmsLeft = std::stoi(tokens[i + 1]);
-						i++;
+						wmsLeft = std::stoi(tokens[++i]);
 					}
 					else if (tokens[i] == "btime") {
-						bmsLeft = std::stoi(tokens[i + 1]);
-						i++;
+						bmsLeft = std::stoi(tokens[++i]);
 					}
 					else if (tokens[i] == "winc") {
-						wTimeInc = std::stoi(tokens[i + 1]);
-						i++;
+						wTimeInc = std::stoi(tokens[++i]);
 					}
 					else if (tokens[i] == "binc") {
-						bTimeInc = std::stoi(tokens[i + 1]);
-						i++;
+						bTimeInc = std::stoi(tokens[++i]);
 					}
 				}
 			}
