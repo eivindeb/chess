@@ -1002,10 +1002,7 @@ int Engine::comNothing(std::string command) {
 		comSend(std::to_string(evaluatePosition() * board.sideToMove) + ", higher is better for white");
 	}
 	else if (tokens[0] == "go") {
-		bool timed = true;
-		if (tokens.size() > 1 && tokens[1] == "infinite") {
-			timed = false;
-		}
+		bool timed = (tokens.size() > 1 && tokens[1] == "infinite") ? false : true;
 		board.printBoard();
 		int moves[218];
 		int numOfMoves;
@@ -1040,7 +1037,7 @@ int Engine::comNothing(std::string command) {
 
 		board.printBoard();
 	}
-	else if (tokens[0] == "print") {
+	else if (tokens[0] == "print" && tokens.size() > 1) {
 		if (tokens.size() > 1 && tokens[1] == "moves") {
 			int moves[218];
 			int numOfMoves;
@@ -1128,6 +1125,9 @@ int Engine::comNothing(std::string command) {
 		else {
 			comSend("move is not legal, use 'print moves' to print all legal moves");
 		}
+	}
+	else {
+		comSend("command not recognized, type help for available commands");
 	}
 	
 	return 1;
@@ -1247,11 +1247,13 @@ int Engine::comUCI(std::string command) {
 			}
 		}
 		else if (tokens[0] == "go") {
+			bool timed = true;
 			if (tokens.size() > 1) {
 				for (int i = 1; i < tokens.size(); i++) {
 					if (tokens[i] == "infinite") {
 						wmsLeft = -1;
 						bmsLeft = -1;
+						timed = false;
 						break;
 					}
 					if (tokens[i] == "wtime") {
@@ -1278,7 +1280,7 @@ int Engine::comUCI(std::string command) {
 			else {
 				numOfMoves = board.getLegalMoves(moves);
 			}
-			move = iterativeDeepening(moves, numOfMoves, true);
+			move = iterativeDeepening(moves, numOfMoves, timed);
 
 			moveStream << "bestmove " << SQ_FILE((move & MOVE_FROM_SQ_MASK)) << SQ_RANK((move & MOVE_FROM_SQ_MASK)) << SQ_FILE(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) << SQ_RANK(((move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT));
 			if (move & MOVE_PROMOTION_MASK) {
