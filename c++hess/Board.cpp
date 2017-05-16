@@ -8,6 +8,7 @@
 #include <iomanip>
 
 Board::Board(std::string fen) {
+	//generate random zobrist seeds
 	for (int sq = 0; sq < 120; sq++) {
 		if (ON_BOARD(sq)) {
 			for (int piece = 0; piece < 6; piece++) {
@@ -28,17 +29,21 @@ Board::Board(std::string fen) {
 
 	zobrist.side = rand64();
 
+	// load optional parameter or base FEN (board position)
 	if (fen != "false") loadFromFen(fen); 
 	else loadFromFen(START_FEN);
 }
 
 void Board::loadFromFen(std::string fen) {
+	//reset piece lists (count and position)
 	for (int i = 0; i < 12; i++) {
 		pieceLists[i][COUNT] = 0;
 		for (int j = 1; j < 11; j++) {
 			pieceLists[i][j] = -1;
 		}
 	}
+
+	//set variables according to FEN
 
 	zobristKey = 0;
 	phaseFlag = PHASE_MG;
@@ -188,6 +193,8 @@ void Board::loadFromFen(std::string fen) {
 		}
 		sq++;
 	}
+
+	// set phase flag depending on material values
 	int pieceVal = getSideMaterialValue(WHITE);
 	if (pieceVal <= 1200) {
 		phaseFlag = PHASE_EG;
@@ -215,6 +222,7 @@ int Board::getLegalMoves(int *moves) {
 	int movesInPosition = 0;
 	int newPos;
 
+	// first check for castling moves
 	if (sideToMove == WHITE) {
 		if (wCastlingRights & CASTLE_SHORT) {
 			if (board[4 + EAST] == EMPTY && board[4 + 2 * EAST] == EMPTY && !sqIsAttacked(4 + EAST, Color(sideToMove*(-1))) && !sqIsAttacked(4 + EAST*2, Color(sideToMove*(-1)))) {
@@ -462,6 +470,7 @@ int Board::getLegalMovesInCheck(int *moves) {
 	return numOfMoves;
 }
 
+//get position of first piece in a given direction from a given square
 int Board::getSqOfFirstPieceOnRay(int fromSq, int ray) {
 	int newPos = fromSq;
 	while (((newPos += ray) & 0x88) == 0) {
@@ -473,6 +482,7 @@ int Board::getSqOfFirstPieceOnRay(int fromSq, int ray) {
 	return -1;
 }
 
+// get all capture and promotion moves
 int Board::getQuiescenceMoves(int *moves) {
 	int movesInPosition = 0;
 	int newPos;
@@ -546,6 +556,7 @@ int Board::getQuiescenceMoves(int *moves) {
 	return movesInPosition;
 }
 
+//helper function to generate all promotion permutations
 inline int Board::addPromotionPermutations(int *moves, int moveNum, int sq, int tarSq, Piece attackedPiece, int capture) {
 	moveAdd(moves, moveNum, sq, tarSq, PAWN, attackedPiece, capture);
 	moves[moveNum++] |= (QUEEN << MOVE_PROMOTED_TO_SHIFT) | (1 << MOVE_PROMOTION_SHIFT);
@@ -1545,7 +1556,7 @@ std::string Board::getFenString() {
 	return fen;
 }
 
-/* function taken from Sungorus chess engine */
+// function taken from Sungorus chess engine
 inline unsigned long long Board::rand64() {
 	static unsigned long long next = 1;
 
