@@ -3,6 +3,7 @@
 #include "Board.h"
 #include "Transposition.h"
 #include "EvalTable.h"
+#include "Evaluator.h"
 #include "Timer.h"
 #include <thread>
 #include <string>
@@ -20,14 +21,12 @@ class Engine {
 		bool isRepetition();
 		int contempt();
 		int quiescence(int alpha, int beta);
-		int evaluatePosition();
 		Board board;
 		void mvvLva(int *moves, int numOfMoves);
 		int sideToPlay;
 		unsigned long long perft(int depth);
 		int iterativeDeepening(int *moves, int numOfMoves, bool timed);
 		Transposition tTable;
-		EvalTable evalTable;
 		void infoPV(int searchLength, int score, bool depthFinished, int pvLine=-1);
 		int moveStringToInt(std::string moveString);
 		void comInit();
@@ -63,4 +62,5 @@ class Engine {
 		int maxDepth;
 		unsigned long long nodeCount;
 		Color findMoveFor;
+		Evaluator evaluator;
 };

@@ -43,7 +43,7 @@
 
 //49999991
 
-Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(4194311), evalTable(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
+Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(4194311), evaluator(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
 	// Create mutex for board to be used by multithreaded communication
@@ -104,13 +104,13 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 
 	bool fPrune = false;
 
-	if (depthLeft == 1 && !inCheck && (evaluatePosition() + pieceValues[BISHOP]) < alpha) { // futility pruning, TODO: stop pruning close to mate value
+	if (depthLeft == 1 && !inCheck && (evaluator.evaluatePosition(board) + pieceValues[BISHOP]) < alpha) { // futility pruning, TODO: stop pruning close to mate value
 		fPrune = true;
 	}
-	else if (depthLeft == 2 && !inCheck && (evaluatePosition() + pieceValues[ROOK]) < alpha) {
+	else if (depthLeft == 2 && !inCheck && (evaluator.evaluatePosition(board) + pieceValues[ROOK]) < alpha) {
 		fPrune = true;
 	}
-	else if (depthLeft == 3 && !inCheck && (evaluatePosition() + pieceValues[QUEEN]) < alpha) {
+	else if (depthLeft == 3 && !inCheck && (evaluator.evaluatePosition(board) + pieceValues[QUEEN]) < alpha) {
 		fPrune = true;
 	}
 
@@ -182,8 +182,9 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 			alpha = score;
 		}
 	}
-	if (timer.timesUp || stopSearch)
+	if (timer.timesUp || stopSearch) {
 		return alpha;
+	}
 
 	tTable.saveEntry(board.zobristKey, depthLeft, board.halfMoveCount - ply, alpha, ttFlag, moves[bestMoveIndex]);
 	return alpha;
@@ -191,7 +192,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 
 int Engine::quiescence(int alpha, int beta) {
 	nodeCount++;
-	int standPat = evaluatePosition();
+	int standPat = evaluator.evaluatePosition(board);
 	if (standPat >= beta) {
 		return beta;
 	}
@@ -293,7 +294,7 @@ unsigned long long Engine::perft(int depthLeft) {
 }
 
 int Engine::miniMax(int depthLeft) {
-	if (depthLeft == 0) return evaluatePosition();
+	if (depthLeft == 0) return evaluator.evaluatePosition(board);
 	int score;
 	int scoreMax = -20000;
 
@@ -335,43 +336,6 @@ int Engine::miniMax(int depthLeft) {
 inline void Engine::mvvLva(int *moves, int numOfMoves) {
 	std::sort(moves, moves + numOfMoves, [](int &lhs, int &rhs) {	return pieceSorting[(lhs & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] > pieceSorting[(rhs & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] ||
 																		(pieceSorting[(lhs & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] == pieceSorting[(rhs & MOVE_ATTACKED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT] && pieceSorting[((lhs & MOVE_MOVED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT)] < pieceSorting[((rhs & MOVE_MOVED_PIECE_MASK) >> MOVE_ATTACKED_PIECE_SHIFT)]); });
-}
-
-int Engine::evaluatePosition() {
-	int score;
-	if ((score = evalTable.probe(board.zobristKey)) != INVALID) {
-		return score;
-	}
-	int moves[218];
-	int wNumOfMoves;
-	int bNumOfMoves;
-	if (board.sideToMove == WHITE) {
-		wNumOfMoves = (board.inCheck(WHITE)) ? board.getLegalMovesInCheck(moves) : board.getLegalMoves(moves);
-		board.sideToMove = Color(board.sideToMove*(-1));
-		bNumOfMoves = (board.inCheck(BLACK)) ? board.getLegalMovesInCheck(moves) : board.getLegalMoves(moves);
-	}
-	else {
-		bNumOfMoves = (board.inCheck(BLACK)) ? board.getLegalMovesInCheck(moves) : board.getLegalMoves(moves);
-		board.sideToMove = Color(board.sideToMove*(-1));
-		wNumOfMoves = (board.inCheck(WHITE)) ? board.getLegalMovesInCheck(moves) : board.getLegalMoves(moves);
-	}
-	board.sideToMove = Color(board.sideToMove*(-1)); // mobility slows down evaluation A LOT.
-	score = board.materialTotal + board.positionTotal + mobilityWeight * (wNumOfMoves - bNumOfMoves);
-	if (board.pieceLists[(board.sideToMove == WHITE) ? BISHOP + 6 : BISHOP][COUNT] > 1) {
-		score += pieceValues[BISHOP] * 0.1;
-	}
-	if (board.pieceLists[(board.sideToMove == WHITE) ? BISHOP : BISHOP + 6][COUNT] > 1) {
-		score -= pieceValues[BISHOP] * 0.1;
-	}
-	int wPawnCount = board.pieceLists[PAWN + 6][COUNT];
-	int bPawnCount = board.pieceLists[PAWN][COUNT];
-	score += (knightPawnCountEval[wPawnCount] - knightPawnCountEval[bPawnCount] + rookPawnCountEval[wPawnCount] - rookPawnCountEval[bPawnCount]) * board.sideToMove;
-
-	score *= board.sideToMove;
-
-	evalTable.save(board.zobristKey, score);
-
-	return score;
 }
 
 int Engine::findBestMove(int *moves, int numOfMoves, int depth, int alpha, int beta, int *pvLines, int *scores) {
@@ -822,10 +786,10 @@ void Engine::infoPV(int searchDepth, int score, bool depthFinished, int pvLine) 
 		if (j == searchDepth) {
 			switch (mode) {
 			case PROTO_NOTHING:
-				pvString = std::to_string(evaluatePosition()*board.sideToMove) + "\t" + pvSS.str();
+				pvString = std::to_string(evaluator.evaluatePosition(board)*board.sideToMove) + "\t" + pvSS.str();
 				break;
 			case PROTO_UCI:
-				pvSS << "score cp " << evaluatePosition()*board.sideToMove;
+				pvSS << "score cp " << evaluator.evaluatePosition(board)*board.sideToMove;
 				break;
 			}
 		}
@@ -999,7 +963,7 @@ int Engine::comNothing(std::string command) {
 		else comSend(board.getFenString());
 	}
 	else if (tokens[0] == "evaluate") {
-		comSend(std::to_string(evaluatePosition() * board.sideToMove) + ", higher is better for white");
+		comSend(std::to_string(evaluator.evaluatePosition(board) * board.sideToMove) + ", higher is better for white");
 	}
 	else if (tokens[0] == "go") {
 		bool timed = (tokens.size() > 1 && tokens[1] == "infinite") ? false : true;
