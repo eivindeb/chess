@@ -13,7 +13,7 @@ class Com;
 
 class Engine {
 	public:
-		Engine(int _sideToPlay, int _depth, std::string fen = "", bool console = false);
+		Engine(int _sideToPlay, int _depth, std::string fen = "");
 		void sortMoves(int *moves, int numOfMoves, int bestMoveId, int ply);
 		int findBestMove(int *moves, int numOfMoves, int depth, int alpha, int beta, int *pvLines, int *scores);
 		int miniMax(int depthLeft);

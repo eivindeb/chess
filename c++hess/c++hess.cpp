@@ -13,7 +13,7 @@
 
 int main()
 {	
-	Engine myengine = Engine(1, 20, "", false);
+	Engine myengine = Engine(1, 20, "");
 	/*Move moves[218];
 	int numOfMoves;
 	int index;

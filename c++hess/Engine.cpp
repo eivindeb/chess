@@ -43,7 +43,7 @@
 
 //49999991
 
-Engine::Engine(int _sideToPlay, int _depth, std::string fen, bool console) : tTable(4194311), evaluator(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
+Engine::Engine(int _sideToPlay, int _depth, std::string fen) : tTable(4194311), evaluator(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
 	// Create mutex for board to be used by multithreaded communication
