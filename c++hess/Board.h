@@ -19,7 +19,7 @@ class Board {
 		int halfMoveCount;
 		int halfMoveClk;
 		int enPassant;
-		void printBoard();
+		void printBoard(bool withIndexBoard=false);
 		void printMove(int move);
 		std::string getFenString();
 		void moveMake(int move);
