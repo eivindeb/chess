@@ -1403,7 +1403,7 @@ void Board::printMove(int move) {
 	std::cout << std::endl;
 }
 
-void Board::printBoard() {
+void Board::printBoard(bool withIndexBoard) {
 	int sq = 112;
 	while(sq >= 0){
 		if (board[sq] == EMPTY) {
@@ -1427,12 +1427,14 @@ void Board::printBoard() {
 		}
 		sq++;
 		if (!ON_BOARD(sq)) {
-			std::cout << "\t";
-			for (int i = 8; i > 0; i--) {
-				if (boardPieceIndex[sq - i] == -1)
-					std::cout << "0";
-				else std::cout << boardPieceIndex[sq - i];
-				std::cout << " ";
+			if (withIndexBoard) {
+				std::cout << "\t";
+				for (int i = 8; i > 0; i--) {
+					if (boardPieceIndex[sq - i] == -1)
+						std::cout << "0";
+					else std::cout << boardPieceIndex[sq - i];
+					std::cout << " ";
+				}
 			}
 			std::cout << std::endl;
 			sq -= 24;
