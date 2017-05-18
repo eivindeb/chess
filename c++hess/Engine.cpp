@@ -46,6 +46,7 @@
 Engine::Engine(int _sideToPlay, int _depth, std::string fen) : tTable(4194311), evaluator(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
 	else board = Board(fen);
+
 	// Create mutex for board to be used by multithreaded communication
 	boardLock = CreateMutex(
 		NULL,              // default security attributes
@@ -61,26 +62,22 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen) : tTable(4194311), 
 	{
 		std::cout << GetLastError() << " Mutex already created" << std::endl;
 	}
-	if (!console) {
-		comInit();
-		std::thread t1 = std::thread([this] {this->comReceive(); });
-		t1.detach();
-	}
-	else {
-		wmsLeft = -1;
-	}
+
+	comInit();
+
+	// initialize historyMoves matrix
 	for (int i = 0; i < 120; i++) {
 		for (int j = 0; j < 120; j++) {
 			historyMoves[i][j] = 0;
 		}
 	}
-	//wmsLeft = 0;
-	//bmsLeft = 0;
+	//timer.wmsLeft = 0;
+	//timer.bmsLeft = 0;
 };
 
 int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNull, bool isPV) {
 	nodeCount++;
-	if (!(nodeCount & 4000) && (timer.timesUp || stopSearch)) {
+	if (!(nodeCount & 4000) && (timer.timesUp || stopSearch)) { //check every 4000 nodes for termination conditions
 		return 0;
 	}
 	bool inCheck = board.inCheck(board.sideToMove);
@@ -530,7 +527,7 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves, bool timed) {
 	int currDepth;
 	decHistoryTable();
 
-	if (mode == PROTO_NOTHING) {
+	if (mode == PROTO_CONSOLE) {
 		std::cout << std::left << std::setw(8) << std::setfill(' ') << "Depth";
 		std::cout << std::left << std::setw(8) << std::setfill(' ') << "Misses";
 		std::cout << std::left << std::setw(10) << std::setfill(' ') << "Nodes";
@@ -572,7 +569,7 @@ int Engine::iterativeDeepening(int *moves, int numOfMoves, bool timed) {
 		}
 		getSearchStats(currDepth, windowMissCount, lastNodeCount, searchStart, scores, multiPVLines, pvCount);
 		bestMove = multiPVLines[0];
-		if (wmsLeft != -1 && (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE > searchLength - timer.mseconds) { // next depth would take longer than remaining time
+		if (timer.wmsLeft != -1 && (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE > searchLength - timer.mseconds) { // next depth would take longer than remaining time
 			std::cout << "Ended search early as next depth would take " << (timer.mseconds - searchStart) * DEPTH_TIME_INCREASE << " ms and we have " << searchLength - timer.mseconds << " ms remaining" << std::endl;
 			timer.stop();
 			break;
@@ -681,7 +678,7 @@ inline void Engine::getSearchStats(int searchDepth, int windoMissCount, unsigned
 	const int numWidth = 10;
 
 	switch (mode) {
-		case PROTO_NOTHING:
+		case PROTO_CONSOLE:
 			if (searchDepth == -1) {
 				std::cout << "Total:\t";
 			}
@@ -719,8 +716,8 @@ inline void Engine::getSearchStats(int searchDepth, int windoMissCount, unsigned
 
 inline unsigned long Engine::calculateTimeForMove(Color side) {
 	if (mode == PROTO_UCI) {
-			int timeLeft = (side == WHITE) ? wmsLeft : bmsLeft;
-			int timeInc = (side == WHITE) ? wTimeInc : bTimeInc;
+			int timeLeft = (side == WHITE) ? timer.wmsLeft : timer.bmsLeft;
+			int timeInc = (side == WHITE) ? timer.wTimeInc : timer.bTimeInc;
 			if (timeLeft == -1) { //not timed game
 				return FIXED_SEARCH_DURATION;
 			}
@@ -734,7 +731,7 @@ inline unsigned long Engine::calculateTimeForMove(Color side) {
 			return timeLeft * fractionAllowed + timeInc;
 			
 	}
-	else if (mode == PROTO_NOTHING) {
+	else if (mode == PROTO_CONSOLE) {
 		return FIXED_SEARCH_DURATION;
 	}
 	
@@ -744,7 +741,7 @@ inline void Engine::infoNPS(unsigned long long nodes, unsigned long startTime) {
 	unsigned long elapsedTime = timer.mseconds - startTime;
 	if (elapsedTime) {
 		switch (mode) {
-			case PROTO_NOTHING:
+			case PROTO_CONSOLE:
 				std::cout << std::left << std::setw(6) << std::setfill(' ') << (nodes / double((timer.mseconds - startTime)));
 				break;
 			case PROTO_UCI:
@@ -754,13 +751,13 @@ inline void Engine::infoNPS(unsigned long long nodes, unsigned long startTime) {
 				break;
 		}
 	}
-	else if (mode == PROTO_NOTHING) {
+	else if (mode == PROTO_CONSOLE) {
 		std::cout << std::left << std::setw(7) << std::setfill(' ') << "N/A";
 	}
 }
 
 void Engine::infoPV(int searchDepth, int score, bool depthFinished, int pvLine) {
-	if (!depthFinished && mode == PROTO_NOTHING) {
+	if (!depthFinished && mode == PROTO_CONSOLE) {
 		return;
 	}
 	int pvLength = 0;
@@ -785,7 +782,7 @@ void Engine::infoPV(int searchDepth, int score, bool depthFinished, int pvLine) 
 	if (score == INVALID) {
 		if (j == searchDepth) {
 			switch (mode) {
-			case PROTO_NOTHING:
+			case PROTO_CONSOLE:
 				pvString = std::to_string(evaluator.evaluatePosition(&board)*board.sideToMove) + "\t" + pvSS.str();
 				break;
 			case PROTO_UCI:
@@ -793,7 +790,7 @@ void Engine::infoPV(int searchDepth, int score, bool depthFinished, int pvLine) 
 				break;
 			}
 		}
-		else if (mode == PROTO_NOTHING) {
+		else if (mode == PROTO_CONSOLE) {
 			pvString = "N/A\t" + pvSS.str();
 		}
 		
@@ -801,7 +798,7 @@ void Engine::infoPV(int searchDepth, int score, bool depthFinished, int pvLine) 
 	else if (mode == PROTO_UCI) {
 		pvSS << "score cp " << score;
 	}
-	else if (mode == PROTO_NOTHING) {
+	else if (mode == PROTO_CONSOLE) {
 		pvString = std::to_string(score) + "\t" + pvSS.str();
 	}
 
@@ -810,7 +807,7 @@ void Engine::infoPV(int searchDepth, int score, bool depthFinished, int pvLine) 
 	}
 
 	switch (mode) {
-		case PROTO_NOTHING:
+		case PROTO_CONSOLE:
 			std::cout << pvString;
 			break;
 		case PROTO_UCI:
@@ -873,7 +870,7 @@ void Engine::comInit() {
 	if (!pipe) {
 		SetConsoleMode(hstdin, dw&~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT));
 		FlushConsoleInputBuffer(hstdin);
-		mode = PROTO_NOTHING;
+		mode = PROTO_CONSOLE;
 		comSend("Type help for commands");
 	}
 	else {
@@ -882,8 +879,10 @@ void Engine::comInit() {
 		mode = PROTO_UCI; 
 	}
 
-	task = TASK_NOTHING;
-	
+	std::thread t1 = std::thread([this] {this->comReceive(); });
+	t1.detach();
+
+	task = TASK_CONSOLE;
 }
 
 int Engine::comReceive() {
@@ -897,8 +896,8 @@ int Engine::comReceive() {
 		std::thread serviceCommandThread;
 
 		switch (mode) {
-			case PROTO_NOTHING: 
-				serviceCommandThread = std::thread([this, command] {this->comNothing(command); });
+			case PROTO_CONSOLE: 
+				serviceCommandThread = std::thread([this, command] {this->comConsole(command); });
 				serviceCommandThread.detach();
 				break;
 			case PROTO_UCI:
@@ -914,7 +913,7 @@ int Engine::comReceive() {
 int Engine::comInput() {
 	unsigned long dw = 0;
 
-	if (task == TASK_NOTHING) return 1;
+	if (task == TASK_CONSOLE) return 1;
 
 	//if (stdin->_cnt > 0) return 1;
 
@@ -924,13 +923,13 @@ int Engine::comInput() {
 	}
 	else {
 		GetNumberOfConsoleInputEvents(hstdin, &dw);
-		if (dw > 1) task = TASK_NOTHING;
+		if (dw > 1) task = TASK_CONSOLE;
 	}
 
 	return 0;
 }
 
-int Engine::comNothing(std::string command) {
+int Engine::comConsole(std::string command) {
 	std::string buf; // Have a buffer string
 	std::stringstream ss(command); // Insert the string into a stream
 
@@ -1215,22 +1214,22 @@ int Engine::comUCI(std::string command) {
 			if (tokens.size() > 1) {
 				for (int i = 1; i < tokens.size(); i++) {
 					if (tokens[i] == "infinite") {
-						wmsLeft = -1;
-						bmsLeft = -1;
+						timer.wmsLeft = -1;
+						timer.bmsLeft = -1;
 						timed = false;
 						break;
 					}
 					if (tokens[i] == "wtime") {
-						wmsLeft = std::stoi(tokens[++i]);
+						timer.wmsLeft = std::stoi(tokens[++i]);
 					}
 					else if (tokens[i] == "btime") {
-						bmsLeft = std::stoi(tokens[++i]);
+						timer.bmsLeft = std::stoi(tokens[++i]);
 					}
 					else if (tokens[i] == "winc") {
-						wTimeInc = std::stoi(tokens[++i]);
+						timer.wTimeInc = std::stoi(tokens[++i]);
 					}
 					else if (tokens[i] == "binc") {
-						bTimeInc = std::stoi(tokens[++i]);
+						timer.bTimeInc = std::stoi(tokens[++i]);
 					}
 				}
 			}

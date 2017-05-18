@@ -10,6 +10,10 @@ class Timer {
 		void incTimer();
 		unsigned long mseconds;
 		bool timesUp;
+		int wmsLeft;
+		int wTimeInc;
+		int bmsLeft;
+		int bTimeInc;
 	private:
 		bool timerStop;
 		std::thread::id threadId;

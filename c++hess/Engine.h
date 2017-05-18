@@ -33,7 +33,7 @@ class Engine {
 		int comReceive();
 		int comUCI(std::string command);
 		int comInput();
-		int comNothing(std::string command);
+		int comConsole(std::string command);
 		void comSend(std::string command);
 		int historyMoves[120][120];
 		void decHistoryTable();
@@ -54,10 +54,6 @@ class Engine {
 		void quicksort(int *arr, int *order, const int left, const int right);
 		int partition(int *arr, int *order, const int left, const int right);
 		unsigned long calculateTimeForMove(Color side);
-		int wmsLeft;
-		int wTimeInc;
-		int bmsLeft;
-		int bTimeInc;
 		bool stopSearch;
 		int maxDepth;
 		unsigned long long nodeCount;
