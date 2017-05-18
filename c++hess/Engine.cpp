@@ -104,13 +104,13 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 
 	bool fPrune = false;
 
-	if (depthLeft == 1 && !inCheck && (evaluator.evaluatePosition(board) + pieceValues[BISHOP]) < alpha) { // futility pruning, TODO: stop pruning close to mate value
+	if (depthLeft == 1 && !inCheck && (evaluator.evaluatePosition(&board) + pieceValues[BISHOP]) < alpha) { // futility pruning, TODO: stop pruning close to mate value
 		fPrune = true;
 	}
-	else if (depthLeft == 2 && !inCheck && (evaluator.evaluatePosition(board) + pieceValues[ROOK]) < alpha) {
+	else if (depthLeft == 2 && !inCheck && (evaluator.evaluatePosition(&board) + pieceValues[ROOK]) < alpha) {
 		fPrune = true;
 	}
-	else if (depthLeft == 3 && !inCheck && (evaluator.evaluatePosition(board) + pieceValues[QUEEN]) < alpha) {
+	else if (depthLeft == 3 && !inCheck && (evaluator.evaluatePosition(&board) + pieceValues[QUEEN]) < alpha) {
 		fPrune = true;
 	}
 
@@ -192,7 +192,7 @@ int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNul
 
 int Engine::quiescence(int alpha, int beta) {
 	nodeCount++;
-	int standPat = evaluator.evaluatePosition(board);
+	int standPat = evaluator.evaluatePosition(&board);
 	if (standPat >= beta) {
 		return beta;
 	}
@@ -294,7 +294,7 @@ unsigned long long Engine::perft(int depthLeft) {
 }
 
 int Engine::miniMax(int depthLeft) {
-	if (depthLeft == 0) return evaluator.evaluatePosition(board);
+	if (depthLeft == 0) return evaluator.evaluatePosition(&board);
 	int score;
 	int scoreMax = -20000;
 
@@ -786,10 +786,10 @@ void Engine::infoPV(int searchDepth, int score, bool depthFinished, int pvLine) 
 		if (j == searchDepth) {
 			switch (mode) {
 			case PROTO_NOTHING:
-				pvString = std::to_string(evaluator.evaluatePosition(board)*board.sideToMove) + "\t" + pvSS.str();
+				pvString = std::to_string(evaluator.evaluatePosition(&board)*board.sideToMove) + "\t" + pvSS.str();
 				break;
 			case PROTO_UCI:
-				pvSS << "score cp " << evaluator.evaluatePosition(board)*board.sideToMove;
+				pvSS << "score cp " << evaluator.evaluatePosition(&board)*board.sideToMove;
 				break;
 			}
 		}
@@ -963,7 +963,7 @@ int Engine::comNothing(std::string command) {
 		else comSend(board.getFenString());
 	}
 	else if (tokens[0] == "evaluate") {
-		comSend(std::to_string(evaluator.evaluatePosition(board) * board.sideToMove) + ", higher is better for white");
+		comSend(std::to_string(evaluator.evaluatePosition(&board) * board.sideToMove) + ", higher is better for white");
 	}
 	else if (tokens[0] == "go") {
 		bool timed = (tokens.size() > 1 && tokens[1] == "infinite") ? false : true;

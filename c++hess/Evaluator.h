@@ -5,6 +5,6 @@
 class Evaluator {
 	public:
 		Evaluator(int tableSize=50);
-		int evaluatePosition(Board board);
+		int evaluatePosition(Board *board);
 		EvalTable evalTable;
 };
