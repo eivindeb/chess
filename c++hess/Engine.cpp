@@ -3,6 +3,7 @@
 #include "Engine.h"
 #include "Communication.h"
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 #include <streambuf>
 #include <string>
@@ -71,8 +72,7 @@ Engine::Engine(int _sideToPlay, int _depth, std::string fen) : tTable(4194311), 
 			historyMoves[i][j] = 0;
 		}
 	}
-	//timer.wmsLeft = 0;
-	//timer.bmsLeft = 0;
+	pendingMove = -1;
 };
 
 int Engine::alphaBeta(int alpha, int beta, int depthLeft, int ply, bool allowNull, bool isPV) {
@@ -939,15 +939,18 @@ int Engine::comConsole(std::string command) {
 		tokens.push_back(buf);
 
 	if (tokens[0] == "help") {
-		comSend("print board\tPrint board");
-		comSend("move xxxx\tMake move");
-		comSend("print moves\tPrint moves");
-		comSend("go\t\tFind move");
-		comSend("fen [fen]\tGet current fen or load from given fen");
-		comSend("stop\t\tStop current search");
-		comSend("analyze\t\tAnalyze position");
+		comSend("\n\n********************************************************");
+		comSend("print board\t\tPrint board");
+		comSend("move xxxx\t\tMake move");
+		comSend("print moves\t\tPrint moves");
+		comSend("go\t\t\tFind and play move");
+		comSend("fen <fen>\t\tGet current fen or load from given fen");
+		comSend("stop\t\t\tStop current search");
+		comSend("analyze\t\t\tAnalyze position");
 		comSend("evaluate\t\tEvaluate position");
-		comSend("exit\t\tEnd process");
+		comSend("tactic <filename>\tRead tactic from HTML");
+		comSend("exit\t\t\tEnd process");
+		comSend("********************************************************\n\n");
 	}
 	else if (tokens[0] == "exit") {
 		exit(0);
@@ -964,7 +967,7 @@ int Engine::comConsole(std::string command) {
 	else if (tokens[0] == "evaluate") {
 		comSend(std::to_string(evaluator.evaluatePosition(&board) * board.sideToMove) + ", higher is better for white");
 	}
-	else if (tokens[0] == "go") {
+	else if (tokens[0] == "go" || tokens[0] == "analyze") {
 		bool timed = (tokens.size() > 1 && tokens[1] == "infinite") ? false : true;
 		board.printBoard();
 		int moves[218];
@@ -996,9 +999,10 @@ int Engine::comConsole(std::string command) {
 			}
 		}
 		comSend(moveStream.str());
-		board.moveMake(move);
-
-		board.printBoard();
+		if (tokens[0] != "analyze") {
+			board.moveMake(move);
+			board.printBoard();
+		}
 	}
 	else if (tokens[0] == "print" && tokens.size() > 1) {
 		if (tokens.size() > 1 && tokens[1] == "moves") {
@@ -1016,6 +1020,35 @@ int Engine::comConsole(std::string command) {
 			playGame(tokens[1]);
 		else
 			playGame();
+	}
+	else if (tokens[0] == "tactic") {
+		/*std::string filepath = "../tactics/";
+		std::string line;
+		filepath.append(tokens[1]);
+		filepath.append(".html");
+		std::ifstream file(filepath); // TODO: sanitize input
+		int i = 0;
+		if (file.is_open()) {
+			while (getline(file, line)) {
+				i++;
+				if (i == 3) {
+					line.find("<")
+				}
+			}
+		}
+		
+		file.close();
+		*/
+		std::string html;
+		for (int i = 1; i < tokens.size(); i++) {
+			html.append(tokens[i]);
+		}
+		int currentPos = 0;
+		int prevPos = currentPos;
+		while ((currentPos = html.find("</move\">", currentPos + 1)) != -1) {
+			comSend(html.substr((html.find(">", currentPos) - currentPos - 6), currentPos));
+			//comSend(std::to_string(currentPos));
+		}
 	}
 	else if (tokens[0] == "move") {
 		int move = 0;
