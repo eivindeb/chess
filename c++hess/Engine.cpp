@@ -43,6 +43,7 @@
 #define MULTI_PV_LINE_NUM		3
 
 //49999991
+//4194311
 
 Engine::Engine(int _sideToPlay, int _depth, std::string fen) : tTable(4194311), evaluator(50), timer(), sideToPlay(_sideToPlay), maxDepth(_depth) {
 	if (fen == "") board = Board();
@@ -940,16 +941,17 @@ int Engine::comConsole(std::string command) {
 
 	if (tokens[0] == "help") {
 		comSend("\n\n********************************************************");
-		comSend("print board\t\tPrint board");
-		comSend("move xxxx\t\tMake move");
-		comSend("print moves\t\tPrint moves");
-		comSend("go\t\t\tFind and play move");
-		comSend("fen <fen>\t\tGet current fen or load from given fen");
-		comSend("stop\t\t\tStop current search");
-		comSend("analyze\t\t\tAnalyze position");
-		comSend("evaluate\t\tEvaluate position");
-		comSend("tactic <filename>\tRead tactic from HTML");
-		comSend("exit\t\t\tEnd process");
+		comSend("print board\t\t\tPrint board");
+		comSend("move xxxx\t\t\tMake move");
+		comSend("algmove xxx\t\t\tMake move (in algebraic notation)");
+		comSend("print moves\t\t\tPrint moves");
+		comSend("go\t\t\t\tFind and play move");
+		comSend("fen <fen>\t\t\tGet current fen or load from given fen");
+		comSend("stop\t\t\t\tStop current search");
+		comSend("analyze\t\t\t\tAnalyze position");
+		comSend("evaluate\t\t\tEvaluate position");
+		comSend("tactic <html>/<file> <filename>\tRead tactic from HTML");
+		comSend("exit\t\t\t\tEnd process");
 		comSend("********************************************************\n\n");
 	}
 	else if (tokens[0] == "exit") {
@@ -960,7 +962,12 @@ int Engine::comConsole(std::string command) {
 	}
 	else if (tokens[0] == "fen") {
 		if (tokens.size() > 1) {
-			board.loadFromFen(tokens[1]);
+			std::string fen;
+			for (int i = 1; i < tokens.size(); i++) {
+				fen.append(tokens[i]);
+				if (i != tokens.size() - 1) fen.append(" ");
+			}
+			board.loadFromFen(fen);
 		}
 		else comSend(board.getFenString());
 	}
@@ -1022,85 +1029,100 @@ int Engine::comConsole(std::string command) {
 			playGame();
 	}
 	else if (tokens[0] == "tactic") {
-		/*std::string filepath = "../tactics/";
-		std::string line;
-		filepath.append(tokens[1]);
-		filepath.append(".html");
-		std::ifstream file(filepath); // TODO: sanitize input
-		int i = 0;
-		if (file.is_open()) {
-			while (getline(file, line)) {
-				i++;
-				if (i == 3) {
-					line.find("<")
+		board = Board();
+		std::string html;
+
+		if (tokens[1] == "file") {
+			std::string filepath = "../tactics/";
+			std::string line;
+			filepath.append(tokens[2]);
+			filepath.append(".txt");
+			std::ifstream file(filepath); // TODO: sanitize input
+			int i = 0;
+			if (file.is_open()) {
+				while (getline(file, line)) {
+					html = line;
+				}
+			}
+
+			file.close();
+			
+		}
+		else {
+			for (int i = 1; i < tokens.size(); i++) {
+				html.append(tokens[i]);
+			}
+		}
+
+		if (html.substr(html.length() - 12) != "</div></div>") {
+			comSend("Not valid html code, perhaps too long for cmd");
+			return 0;
+		}
+
+		int currentPos = 0;
+		while ((currentPos = html.find("</move>", currentPos + 1)) != -1) {
+			int moveStart = html.find(">", currentPos - 10) + 1;
+			comSend(html.substr(moveStart, currentPos - moveStart));
+			board.moveMake(board.algebraicNotationToMove(html.substr(moveStart, currentPos - moveStart)));
+		}
+		board.printBoard();
+	}
+	else if (tokens[0] == "move" || tokens[0] == "algmove") {
+		int move = 0;
+		if (tokens[1] == "move") {
+			std::string moveString = tokens.back();
+			std::string moveFrom = moveString.substr(0, 2);
+			std::string moveTo = moveString.substr(2);
+
+			int sqFrom = SQ_STR_TO_INT(moveFrom);
+			int sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
+
+			if (sqFrom == (board.history[board.historyIndex].move & MOVE_FROM_SQ_MASK) && sqTo == ((board.history[board.historyIndex].move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) {
+				comSend("ignoring my own move");
+				return 0; // the move the engine did so we ignore it
+			}
+
+			move = sqFrom | (sqTo << MOVE_TO_SQ_SHIFT);
+			move |= (board.board[sqFrom]) << MOVE_MOVED_PIECE_SHIFT;
+
+			if (moveTo.length() == 3) { //promotion
+				move |= (1 << MOVE_PROMOTION_SHIFT);
+				switch (moveTo.back()) {
+				case 'q':
+					move |= (QUEEN << MOVE_PROMOTED_TO_SHIFT);
+					break;
+				case 'r':
+					move |= (ROOK << MOVE_PROMOTED_TO_SHIFT);
+					break;
+				case 'b':
+					move |= (BISHOP << MOVE_PROMOTED_TO_SHIFT);
+					break;
+				case 'k':
+					move |= (KNIGHT << MOVE_PROMOTED_TO_SHIFT);
+					break;
+				default:
+					comSend("Unexpected third parameter in moveTo, was:");
+					comSend(moveTo);
+					break;
+				}
+			}
+
+			if (board.board[sqTo] != EMPTY)
+				move |= (1 << MOVE_CAPTURE_SHIFT);
+			move |= (board.board[sqTo] << MOVE_ATTACKED_PIECE_SHIFT);
+			if (sqTo == board.enPassant) move |= (1 << MOVE_EN_PASSANT_SHIFT);
+
+			if (board.board[sqFrom] == KING && abs(sqFrom - sqTo) == 2) {
+				if (sqFrom > sqTo) {
+					move |= (1 << MOVE_CASTLE_LONG_SHIFT);
+				}
+				else {
+					move |= (1 << MOVE_CASTLE_SHORT_SHIFT);
 				}
 			}
 		}
-		
-		file.close();
-		*/
-		std::string html;
-		for (int i = 1; i < tokens.size(); i++) {
-			html.append(tokens[i]);
-		}
-		int currentPos = 0;
-		int prevPos = currentPos;
-		while ((currentPos = html.find("</move\">", currentPos + 1)) != -1) {
-			comSend(html.substr((html.find(">", currentPos) - currentPos - 6), currentPos));
-			//comSend(std::to_string(currentPos));
-		}
-	}
-	else if (tokens[0] == "move") {
-		int move = 0;
-		std::string moveString = tokens.back();
-		std::string moveFrom = moveString.substr(0, 2);
-		std::string moveTo = moveString.substr(2);
-
-		int sqFrom = SQ_STR_TO_INT(moveFrom);
-		int sqTo = SQ_STR_TO_INT(moveTo.substr(0, 2));
-
-		if (sqFrom == (board.history[board.historyIndex].move & MOVE_FROM_SQ_MASK) && sqTo == ((board.history[board.historyIndex].move & MOVE_TO_SQ_MASK) >> MOVE_TO_SQ_SHIFT)) {
-			comSend("ignoring my own move");
-			return 0; // the move the engine did so we ignore it
-		}
-
-		move = sqFrom | (sqTo << MOVE_TO_SQ_SHIFT);
-		move |= (board.board[sqFrom]) << MOVE_MOVED_PIECE_SHIFT;
-
-		if (moveTo.length() == 3) { //promotion
-			move |= (1 << MOVE_PROMOTION_SHIFT);
-			switch (moveTo.back()) {
-			case 'q':
-				move |= (QUEEN << MOVE_PROMOTED_TO_SHIFT);
-				break;
-			case 'r':
-				move |= (ROOK << MOVE_PROMOTED_TO_SHIFT);
-				break;
-			case 'b':
-				move |= (BISHOP << MOVE_PROMOTED_TO_SHIFT);
-				break;
-			case 'k':
-				move |= (KNIGHT << MOVE_PROMOTED_TO_SHIFT);
-				break;
-			default:
-				comSend("Unexpected third parameter in moveTo, was:");
-				comSend(moveTo);
-				break;
-			}
-		}
-
-		if (board.board[sqTo] != EMPTY)
-			move |= (1 << MOVE_CAPTURE_SHIFT);
-		move |= (board.board[sqTo] << MOVE_ATTACKED_PIECE_SHIFT);
-		if (sqTo == board.enPassant) move |= (1 << MOVE_EN_PASSANT_SHIFT);
-
-		if (board.board[sqFrom] == KING && abs(sqFrom - sqTo) == 2) {
-			if (sqFrom > sqTo) {
-				move |= (1 << MOVE_CASTLE_LONG_SHIFT);
-			}
-			else {
-				move |= (1 << MOVE_CASTLE_SHORT_SHIFT);
-			}
+		else {
+			move = board.algebraicNotationToMove(tokens[1]);
 		}
 		bool moveIsLegal = false;
 
