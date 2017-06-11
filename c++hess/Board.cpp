@@ -1558,6 +1558,98 @@ std::string Board::getFenString() {
 	return fen;
 }
 
+int Board::algebraicNotationToMove(std::string algMove) {
+	if (algMove.find("+") != -1) { //remove check symbol
+		algMove.pop_back();
+	}
+	int move[1] = { 0 };
+
+	//castles
+	if (algMove == "O-O") {
+		moveAdd(move, 0, (sideToMove == WHITE ? 4 : 116), (sideToMove == WHITE ? 6 : 118), KING, EMPTY, 0);
+		move[0] |= (MOVE_CASTLE_SHORT << MOVE_CASTLE_LONG_SHIFT);
+		return move[0];
+	}
+	if (algMove == "O-O-O") {
+		moveAdd(move, 0, (sideToMove == WHITE ? 4 : 116), (sideToMove == WHITE ? 2 : 114), KING, EMPTY, 0);
+		move[0] |= (MOVE_CASTLE_LONG << MOVE_CASTLE_LONG_SHIFT);
+		return move[0];
+	}
+
+	int capture = algMove.find("x");
+	int toSq, fromSq;
+	Piece movingPieceType;
+	switch (algMove[0]) {
+		case 'K':
+			movingPieceType = KING;
+			break;
+		case 'Q':
+			movingPieceType = QUEEN;
+			break;
+		case 'N':
+			movingPieceType = KNIGHT;
+			break;
+		case 'B':
+			movingPieceType = BISHOP;
+			break;
+		case 'R':
+			movingPieceType = ROOK;
+			break;
+		default:
+			movingPieceType = PAWN;
+			break;
+	}
+
+	if (movingPieceType == PAWN) {
+		if (capture != -1) {
+			toSq = SQ_STR_TO_INT(algMove.substr(2,4));
+			fromSq = int(algMove[0] - 97) + 16 * (int(algMove[3] - '0') + (sideToMove == WHITE ? -2 : 0));
+			if (toSq == enPassant) {
+				moveAdd(move, 0, fromSq, toSq, PAWN, PAWN, 1);
+				move[0] |= (1 << MOVE_EN_PASSANT_SHIFT);
+				return move[0];
+			}
+		}
+		else {
+			toSq = SQ_STR_TO_INT(algMove);
+			if ((SQ_RANK(toSq) == (sideToMove == WHITE ? 4 : 5) && board[toSq + (sideToMove == WHITE ? SOUTH : NORTH)] == EMPTY)) { //pawn double move
+				fromSq = toSq + (sideToMove == WHITE ? SS : NN);
+			}
+			else {
+				fromSq = toSq + (sideToMove == WHITE ? SOUTH : NORTH);
+			}
+		}
+	}
+	else {
+		if (algMove.length() == (capture == -1 ? 5 : 6)) { // rare case of ambiguity between 3 pieces, so both rank and file of moving piece is given
+			fromSq = SQ_STR_TO_INT(algMove.substr(1, 3)); 
+			toSq = SQ_STR_TO_INT(algMove.substr(algMove.length() - 2));
+			moveAdd(move, 0, fromSq, toSq, movingPieceType, board[toSq], capture);
+			return move[0];
+		}
+
+		toSq = SQ_STR_TO_INT(algMove.substr(algMove.length() - 2));
+		int attackers[20];
+		int numOfAttackers = getSqAttackers(attackers, toSq, sideToMove);
+		for (int i = 0; i < numOfAttackers; i++) {
+			if (board[attackers[i]] == movingPieceType) {
+				if (algMove.length() > (capture == -1 ? 3 : 4)) {
+					if ((isalpha(algMove[1]) && SQ_FILE(attackers[i]) == algMove[1]) || (isdigit(algMove[1]) && SQ_RANK(attackers[i]) == int(algMove[1] - '0'))) {
+						fromSq = attackers[i];
+						break;
+					}
+				}
+				else {
+					fromSq = attackers[i];
+					break;
+				}
+			}
+		}
+	}
+	moveAdd(move, 0, fromSq, toSq, movingPieceType, board[toSq], capture != -1 ? 1 : 0);
+	return move[0];
+}
+
 // function taken from Sungorus chess engine
 inline unsigned long long Board::rand64() {
 	static unsigned long long next = 1;

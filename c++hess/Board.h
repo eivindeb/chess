@@ -42,6 +42,7 @@ class Board {
 		unsigned long long repStack[1024];
 		int	repIndex;
 		int pieceLists[12][11];
+		int algebraicNotationToMove(std::string algMove);
 	private:
 		void moveAdd(int *moves, int moveNum, int squareFrom, int squareTo, Piece movedPiece, Piece attacked, int capture);
 		int wKingSq;
